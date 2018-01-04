@@ -1241,6 +1241,7 @@ param(
 	
 	# Obtain the machine name from the environment variable.
 	$localComputerName = get-content env:computername
+	$localComputerDomain = Get-PISysAudit_RegistryKeyValue "HKLM:\SYSTEM\CurrentControlSet\services\Tcpip\Parameters" "Domain" -lc $true -rcn $ComputerName -dbgl $DBGLevel
 	
 	# Validate if the server name refers to the local one	
 	if(($ComputerName -eq "") -or ($ComputerName.ToLower() -eq "localhost"))
@@ -1248,7 +1249,7 @@ param(
 		$ComputerName = $localComputerName.ToLower()
 		$LocalComputer = $true
 	}
-	elseif($localComputerName.ToLower() -eq $ComputerName.ToLower())
+	elseif($localComputerName.ToLower() -eq $ComputerName.ToLower() -or ($localComputerName.ToLower() + "." + $localComputerDomain.ToLower()) -eq $ComputerName.ToLower())
 	{									
 		$ComputerName = $localComputerName.ToLower()
 		$LocalComputer = $true
