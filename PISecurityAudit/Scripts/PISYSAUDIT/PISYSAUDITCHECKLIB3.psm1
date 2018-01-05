@@ -846,7 +846,8 @@ PROCESS
 			{
 				$afServer = $global:AFServerConnection.ConnectionInfo.PISystem
 				# Get identities with Admin Right on the AF Server object
-				$afAdminIdentities = Get-AFSecurity -AFObject $afserver `
+				$afAdminIdentities = @()
+				$afAdminIdentities += Get-AFSecurity -AFObject $afserver `
 											| ForEach-Object {if($_.Rights -like '*Admin*'){$_}} `
 											| Select-Object -ExpandProperty Identity
 				# Flag if more than one Identity is an AF super user 
@@ -854,7 +855,8 @@ PROCESS
 				If($afAdminIdentities.Count -eq 1){ $hasSingleIdentity = $true }
 
 				# Find all mappings to super user identities. 
-				$afAdminMappings = Get-AFSecurityMapping -AFServer $afserver `
+				$afAdminMappings = @()
+				$afAdminMappings += Get-AFSecurityMapping -AFServer $afserver `
 											| ForEach-Object {if($_.SecurityIdentity -in $afAdminIdentities){$_}} `
 											| Select-Object Name, SecurityIdentity, Account
 				# Flag if more than one mapping exists to the AF super user 
@@ -898,12 +900,13 @@ PROCESS
 						if($hasSingleIdentity)
 						{
 							$msg = "Multiple Windows Principals mapped to an AF Identity with Admin rights.  Evaluate whether Admin rights are necessary for: "
+							foreach ($afAdminMapping in $afAdminMappings) { $msg += " Mapping-" + $afAdminMapping.Name + '; AF Identity-' + $afAdminMapping.SecurityIdentity + "|" }
 						}
 						else # Multiple Identities should not have super user access
 						{
 							$msg = "Multiple AF Identities have AF Admin rights.  Evaluate whether Admin rights are necessary for: "	
+							foreach ($afAdminIdentity in $afAdminIdentities) { $msg += " AF Identity-" + $afAdminIdentity.Name + "|" }
 						}
-						foreach ($afAdminMapping in $afAdminMappings) { $msg += " Mapping-" + $afAdminMapping.Name + '; AF Identity-' + $afAdminMapping.SecurityIdentity + "|" } 
 					}	
 				}
 				else # Evaluate well known accounts for severity

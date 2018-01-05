@@ -997,13 +997,21 @@ END {}
 
 function Test-PowerShellToolsForPISystemAvailable
 {
-    # Check for availability of PowerShell Tools for the PI System
+    $fn = GetFunctionName
+	# Check for availability of PowerShell Tools for the PI System
     if(-not(Test-Path variable:global:ArePowerShellToolsAvailable))
 	{
 		if(Get-Module -ListAvailable -Name OSIsoft.PowerShell)
 		{
 			Import-Module -Name OSIsoft.PowerShell
 			$global:ArePowerShellToolsAvailable = $true
+			$version = $(Get-Module OSIsoft.PowerShell).Version
+			if($version.Major -lt 2)
+			{
+				$msg = "Legacy version of PowerShell Tools for the PI System (OSIsoft.PowerShell module version $version) detected."
+				$msg += "Install the latest version of PI System Management Tools to update the module for best performance."
+				Write-PISysAudit_LogMessage $msg "Warning" $fn
+			}
 		}
 		else
 		{
@@ -1240,6 +1248,8 @@ param(
 			$msgTemplate = "The computer {0} does not have a PI Data Archive role or the validation failed"
 			$msg = [string]::Format($msgTemplate, $ComputerParams.ComputerName)
 			Write-PISysAudit_LogMessage $msg "Warning" $fn
+			$AuditTable = New-PISysAuditError -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName `
+							-at $AuditTable -an "PI Data Archive Audit" -fn $fn -msg $msg
 			return
 		}
 
@@ -2134,7 +2144,10 @@ PROCESS
 	{
 		$scriptBlock = {
 				param([string]$Variable) 
-				Get-ChildItem -Path $('Env:' + $Variable) | Select-Object -ExpandProperty Value
+				if(Test-Path -Path $('Env:' + $Variable))
+				{
+					Get-ChildItem -Path $('Env:' + $Variable) | Select-Object -ExpandProperty Value
+				}
 			}
 		# Execute the GetEnvironmentVariable method locally or remotely via the Invoke-Command cmdlet.
 		if($LocalComputer)
@@ -2147,8 +2160,7 @@ PROCESS
 		}
 		
 		# Verbose if debug level is 2+
-		$msgTemplate = "Value returned is {0}"
-		$msg = [string]::Format($msgTemplate, $value)
+		$msg = "Value returned is: $value"
 		Write-PISysAudit_LogMessage $msg "Debug" $fn -rdbgl 2 -dbgl $DBGLevel
 
 		# Return the value found.
