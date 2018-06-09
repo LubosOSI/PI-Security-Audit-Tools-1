@@ -4,6 +4,10 @@
 
 The PI Security Audit Tools project is a framework to baseline the security configuration of your PI System.  The module (PISysAudit) can be executed locally or remotely to validate the security configuration of various PI System components: PI Data Archive, PI AF Server, PI Vision, SQL Server and the hosting OS.  
 
+**Note:** The PI Security DSC Module is developed and maintained in the [osisoft/PI-Security-DSC](https://github.com/osisoft/PI-Security-DSC) repository.
+
+![Alt text](Resources/Example-PI-Data-Archive-Detail-Report.PNG?raw=true "Example PI Data Archive Detail Report")
+
 ## Getting Started
 
 Get the latest release version of the PI Security Audit Tools from [Releases](https://github.com/osisoft/PI-Security-Audit-Tools/releases).
@@ -12,9 +16,9 @@ Find setup and operation instructions in the readme.txt [here](https://github.co
 
 Check out the [Wiki](https://github.com/osisoft/PI-Security-Audit-Tools/wiki) for tutorials and more information on the project.
 
-## Discussion
+## Discussion and Support
 
-To discuss the project or ask questions, please make a comment on our [project post](https://pisquare.osisoft.com/groups/security/blog/2016/07/26/check-out-the-pi-security-audit-tools-on-github) on PI Square.
+The modules are supported through the [PI Security Audit Tools](https://github.com/osisoft/PI-Security-Audit-Tools) repository and the [PI Square Security Group](https://pisquare.osisoft.com/groups/security).  To discuss the project or ask questions, please make a comment on our [project post](https://pisquare.osisoft.com/groups/security/blog/2016/07/26/check-out-the-pi-security-audit-tools-on-github) on PI Square. Please do not contact OSIsoft Technical Support regarding the PI Security Audit Tools modules.
 
 ## Contributing
 

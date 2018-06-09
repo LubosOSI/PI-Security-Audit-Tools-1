@@ -1,9 +1,4 @@
-# ***********************************************************************
-# Validation library
-# ***********************************************************************
-# * Modulename:   PISYSAUDIT
-# * Filename:     PISYSAUDITCHECKLIB5.psm1
-# * Description:  Validation rules for PI Vision.
+# ************************************************************************
 # *
 # * Copyright 2016 OSIsoft, LLC
 # * Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,14 +13,6 @@
 # * See the License for the specific language governing permissions and
 # * limitations under the License.
 # *
-# * Modifications copyright (C) 2016 Harry Paul, OSIsoft, LLC
-# * Created validation rule module based off of template used for the
-# * previous modules.
-# *
-# ************************************************************************
-# Version History:
-# ------------------------------------------------------------------------
-#
 # ************************************************************************
 
 # ........................................................................
@@ -57,6 +44,7 @@ param(
 	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIVisionAppPools" 1 "AU50002"
 	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIVisionSSL"      1 "AU50003"
 	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIVisionSPN"      1 "AU50004"
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIVisionHeaders"  1 "AU50005"
 	
 	# Return all items at or below the specified AuditLevelInt
 	return $listOfFunctions | Where-Object Level -LE $AuditLevelInt
@@ -99,6 +87,10 @@ param(
 		[string]
 		$RemoteComputerName = "",
 		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("al")]
+		[string]
+		$Alias = "",
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
 		[alias("dbgl")]
 		[int]
 		$DBGLevel = 0)		
@@ -132,7 +124,8 @@ PROCESS
 			$UsingHTTPS = $Bindings.protocol -contains "https"
 			$sslFlagsSite = Get-WebConfigurationProperty -Location $($Site.ToString()) -Filter system.webServer/security/access -Name "sslFlags"
 			$sslFlagsApp = Get-WebConfigurationProperty -Location $($Site.ToString() + '/' + $ProductName) -Filter system.webServer/security/access -Name "sslFlags"
-			$BasicAuthEnabled = Get-WebConfigurationProperty -Filter /system.webServer/security/authentication/BasicAuthentication -Name Enabled -location $($Site.ToString() + '/' + $ProductName) | select-object Value	
+			$BasicAuthEnabled = Get-WebConfigurationProperty -Filter /system.webServer/security/authentication/BasicAuthentication -Name Enabled -location $($Site.ToString() + '/' + $ProductName) | select-object Value
+			$customHeaders = Get-WebConfigurationProperty -Location $($Site.ToString() + '/' + $ProductName) -Filter /system.webServer/httpProtocol -Name "customHeaders" | Select-Object -ExpandProperty Collection
 			
 			# App Pool Info 
 			$ServiceAppPoolType = Get-ItemProperty $('iis:\apppools\' + $ProductName + 'serviceapppool') -Name processmodel.identitytype
@@ -156,6 +149,7 @@ PROCESS
 			$Configuration | Add-Member -MemberType NoteProperty -Name UsingHTTPS -Value $UsingHTTPS
 			$Configuration | Add-Member -MemberType NoteProperty -Name sslFlagsSite -Value $sslFlagsSite
 			$Configuration | Add-Member -MemberType NoteProperty -Name sslFlagsApp -Value $sslFlagsApp
+			$Configuration | Add-Member -MemberType NoteProperty -Name customHeaders -Value $customHeaders
 			
 			return $Configuration
 		}
@@ -165,6 +159,11 @@ PROCESS
 		{ $global:PIVisionConfiguration = & $scriptBlock }
 		else
 		{ $global:PIVisionConfiguration = Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock $scriptBlock }
+		
+		if(![string]::IsNullOrEmpty($Alias))
+		{
+		    $global:PIVisionConfiguration | Add-Member -MemberType NoteProperty -Name Alias -Value $Alias
+	    }
 	}
 	catch
 	{
@@ -190,7 +189,7 @@ product page for the latest version and associated documentation:<br/>
 <a href="https://techsupport.osisoft.com/Products/Visualization/PI-Vision/">https://techsupport.osisoft.com/Products/Visualization/PI-Vision/ </a><br/>
 For more information on the upgrade procedure, see "Upgrade a PI Vision 
 installation" in the PI Live Library:<br/>
-<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/vision-v1/GUID-5CF8A863-E056-4B34-BB6B-8D4F039D8DA6">https://livelibrary.osisoft.com/LiveLibrary/content/en/vision-v1/GUID-5CF8A863-E056-4B34-BB6B-8D4F039D8DA6</a><br/>
+<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/vision-v2/GUID-5CF8A863-E056-4B34-BB6B-8D4F039D8DA6">https://livelibrary.osisoft.com/LiveLibrary/content/en/vision-v2/GUID-5CF8A863-E056-4B34-BB6B-8D4F039D8DA6</a><br/>
 Associated security bulletins:<br/>
 <a href="https://techsupport.osisoft.com/Products/Visualization/PI-Vision/Alerts">https://techsupport.osisoft.com/Products/Visualization/PI-Vision/Alerts</a>
 #>
@@ -274,7 +273,7 @@ VALIDATION: checks PI Vision AppPool identity.<br/>
 COMPLIANCE: Use a custom domain account. Network Service is acceptable, but not
 ideal. For more information, see "Create a service account for PI Vision" in 
 the PI Live Library: <br/>
-<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/vision-v1/GUID-A790D013-BAC8-405B-A017-33E55595B411">https://livelibrary.osisoft.com/LiveLibrary/content/en/vision-v1/GUID-A790D013-BAC8-405B-A017-33E55595B411</a>
+<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/vision-v2/GUID-A790D013-BAC8-405B-A017-33E55595B411">https://livelibrary.osisoft.com/LiveLibrary/content/en/vision-v2/GUID-A790D013-BAC8-405B-A017-33E55595B411</a>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(							
@@ -393,7 +392,7 @@ COMPLIANCE: A valid HTTPS binding is configured and only connections with SSL
 are allowed. The SSL certificate is issued by a Certificate Authority. For more 
 information, see "Configure Secure Sockets Layer (SSL) access" in the PI Live 
 Library: <br/>
-<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/vision-v1/GUID-CB46B733-264B-48D3-9033-73D16B4DBD3B">https://livelibrary.osisoft.com/LiveLibrary/content/en/vision-v1/GUID-CB46B733-264B-48D3-9033-73D16B4DBD3B</a>
+<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/vision-v2/GUID-CB46B733-264B-48D3-9033-73D16B4DBD3B">https://livelibrary.osisoft.com/LiveLibrary/content/en/vision-v2/GUID-CB46B733-264B-48D3-9033-73D16B4DBD3B</a>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(							
@@ -547,7 +546,7 @@ VALIDATION: Checks PI Vision SPN assignment. <br/>
 COMPLIANCE: HTTP or HOST SPNs exist and are assigned to the PI Vision AppPool 
 account. This makes Kerberos Authentication possible. For more information, 
 see the PI Live Library link below. <br/>
-<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/vision-v1/GUID-68329569-D75C-406D-AE2D-9ED512E74D46">https://livelibrary.osisoft.com/LiveLibrary/content/en/vision-v1/GUID-68329569-D75C-406D-AE2D-9ED512E74D46</a>
+<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/vision-v2/GUID-68329569-D75C-406D-AE2D-9ED512E74D46">https://livelibrary.osisoft.com/LiveLibrary/content/en/vision-v2/GUID-68329569-D75C-406D-AE2D-9ED512E74D46</a>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(							
@@ -577,7 +576,6 @@ PROCESS
 	{		
 		$ServiceAppPoolType = $global:PIVisionConfiguration.ServiceAppPoolType  # Service AppPool Identity Type 
 		$ServiceAppPoolUser = $global:PIVisionConfiguration.ServiceAppPoolUser  # Service AppPool User
-		$WebBindings = $global:PIVisionConfiguration.Bindings # Web Site bindings.
 
 		# Using the http service class.
 		$serviceType = "http"
@@ -585,21 +583,29 @@ PROCESS
 		# Special 'service name' for PI Vision.
 		# This is needed to distinguish between SPN check for IIS Apps such as PI Vision, and Windows Services such as PI or AF.
 		$serviceName = "pivision"
-
-		# Converting the binding info to a string. Otherwise $matches based on RegExps are not returned correctly.
-		$BindingsToString = $($WebBindings) | Out-String
-
-		# Leverage WebBindings global variable and look for custom headers.
-		$matches = [regex]::Matches($BindingsToString, ':{1}\d+:{1}(\S+)\s') 
-				
-		# Go through all bindings.
-		foreach ($match in $matches) 
+		
+		# Use alias if specified, otherwise check for the custom host header
+		if(![string]::IsNullOrEmpty($global:PIVisionConfiguration.Alias))
 		{
-			$CustomHeader = $match.Groups[1].Captures[0].Value 				
-			If ($CustomHeader) # A custom host header is used!
-			{ 
-				$serviceName = "pivision_custom"
-				break 
+			$CustomHeader = $global:PIVisionConfiguration.Alias
+			$serviceName = "pivision_custom"
+		}
+		else
+		{	
+			$WebBindings = $global:PIVisionConfiguration.Bindings 
+			# Converting the binding info to a string. Otherwise $matches based on RegExps are not returned correctly.
+			$BindingsToString = $($WebBindings) | Out-String
+			# Leverage WebBindings global variable and look for custom headers.
+			$matches = [regex]::Matches($BindingsToString, ':{1}\d+:{1}(\S+)\s') 
+			# Go through all bindings.
+			foreach ($match in $matches) 
+			{
+				$CustomHeader = $match.Groups[1].Captures[0].Value
+				If ($CustomHeader) # A custom host header is used!
+				{ 
+					$serviceName = "pivision_custom"
+					break 
+				}
 			}
 		}
 
@@ -660,22 +666,23 @@ END {}
 #***************************
 }
 
-
-# ........................................................................
-# Add your cmdlet after this section. Don't forget to add an intruction
-# to export them at the bottom of this script.
-# ........................................................................
-function Get-PISysAudit_TemplateAU1xxxx
+function Get-PISysAudit_CheckPIVisionHeaders
 {
-<#  
+<#
 .SYNOPSIS
-AU5xxxx - <Name>
+AU50005 - PI Vision HTTP Headers
 .DESCRIPTION
-VALIDATION: <Enter what the verification checks>
-COMPLIANCE: <Enter what it needs to be compliant>
+VALIDATION: Checks for recommended PI Vision HTTP response headers. <br/>
+COMPLIANCE: Ensure that the default HTTP headers in PI Vision 2017 R2 are configured: <br/>
+- X-Frame-Options: SAMEORIGIN <br/>
+- X-Content-Type-Options: nosniff <br/>
+- Referrer-Policy: no-referrer <br/>
+- X-XSS-Protection: 1; mode=block <br/>
+For more information on these headers, see KB01631: <br/>
+<a href="http://techsupport.osisoft.com/Troubleshooting/KB/KB01631/">http://techsupport.osisoft.com/Troubleshooting/KB/KB01631/</a>
 #>
-[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
-param(							
+[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]
+param(
 		[parameter(Mandatory=$true, Position=0, ParameterSetName = "Default")]
 		[alias("at")]
 		[System.Collections.HashTable]
@@ -691,35 +698,173 @@ param(
 		[parameter(Mandatory=$false, ParameterSetName = "Default")]
 		[alias("dbgl")]
 		[int]
-		$DBGLevel = 0)		
+		$DBGLevel = 0)
 BEGIN {}
 PROCESS
-{		
+{
 	# Get and store the function Name.
 	$fn = GetFunctionName
-	
+	$msg = ''
+
 	try
-	{		
-		# Enter routine.
-		# Use information from $global:PIVisionConfiguration whenever possible to 
-		# focus on validation simplify logic. 		
+	{
+		# PI Vision 2017 R2 default headers:
+		#   X-Frame-Options: SAMEORIGIN
+		#   X-Content-Type-Options: nosniff
+		#   Referrer-Policy: no-referrer
+		#   X-XSS-Protection: 1; mode=block
+		# Some headers have alternate values that are equally or more restrictive,
+		# should pass checks in this case.
+		$defaultHeaders = @{
+			"X-Frame-Options" = @( "SAMEORIGIN", "DENY", "ALLOW-FROM *" );
+			"X-Content-Type-Options" = "nosniff";
+			"Referrer-Policy" = @( "no-referrer", "same-origin" );
+			"X-XSS-Protection" = "1; mode=block"
+		}
+
+		$customHeaders = $global:PIVisionConfiguration.customHeaders
+
+		if($null -ne $customHeaders)
+		{
+			$failedHeaders = [System.Collections.ArrayList]@()
+			$missingHeaders = [System.Collections.ArrayList]@()
+			foreach($defaultHeader in $defaultHeaders.GetEnumerator())
+			{
+				if($defaultHeader.Key -in $customHeaders.name)
+				{
+					$header = $customHeaders | Where-Object name -EQ $defaultHeader.Key
+					$headerPassed = $false
+					foreach($allowed in $defaultHeader.Value)
+					{
+						if($header.value -like $allowed) { $headerPassed = $true }
+					}
+					if(-not $headerPassed)
+					{
+						$failedHeaders.Add($header.name) | Out-Null
+					}
+				}
+				else
+				{
+					$missingHeaders.Add($defaultHeader.Key) | Out-Null
+				}
+			}
+
+			if($failedHeaders.Count -gt 0)
+			{
+				$result = $false
+				$msg += "Headers with insecure settings: "
+				for($i=0;$i -lt $failedHeaders.Count;$i++)
+				{
+					if($i -gt 0) { $msg += ', ' }
+					$msg += $failedHeaders[$i]
+				}
+				$msg += '. '
+			}
+			if($missingHeaders.Count -gt 0)
+			{
+				$result = $false
+				$msg += "Missing headers: "
+				for($i=0;$i -lt $missingHeaders.Count;$i++)
+				{
+					if($i -gt 0) { $msg += ', ' }
+					$msg += $missingHeaders[$i]
+				}
+			}
+			if(($failedHeaders.Count -eq 0) -and ($missingHeaders.Count -eq 0))
+			{
+				$result = $true
+				$msg = "Recommended HTTP headers are configured in PI Vision."
+			}
+		}
+		else
+		{
+			$result = $false
+			$msg = "No HTTP response headers configured for PI Vision."
+		}
 	}
 	catch
 	{
 		# Return the error message.
-		$msg = "A problem occurred during the processing of the validation check"					
-		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_									
+		$msg = "A problem occurred during the processing of the validation check"
+		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_
 		$result = "N/A"
-	}	
-	
-	# Define the results in the audit table	
+	}
+
+	# Define the results in the audit table
+	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
+									-at $AuditTable "AU50005" `
+									-ain "PI Vision HTTP Headers" -aiv $result `
+									-aif $fn -msg $msg `
+									-Group1 "PI System" -Group2 "PI Vision" `
+									-Severity "Low"
+}
+
+END {}
+
+#***************************
+#End of exported function
+#***************************
+}
+
+# ........................................................................
+# Add your cmdlet after this section. Don't forget to add an intruction
+# to export them at the bottom of this script.
+# ........................................................................
+function Get-PISysAudit_TemplateAU1xxxx
+{
+<#  
+.SYNOPSIS
+AU5xxxx - <Name>
+.DESCRIPTION
+VALIDATION: <Enter what the verification checks>
+COMPLIANCE: <Enter what it needs to be compliant>
+#>
+[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]
+param(
+		[parameter(Mandatory=$true, Position=0, ParameterSetName = "Default")]
+		[alias("at")]
+		[System.Collections.HashTable]
+		$AuditTable,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("lc")]
+		[boolean]
+		$LocalComputer = $true,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("rcn")]
+		[string]
+		$RemoteComputerName = "",
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("dbgl")]
+		[int]
+		$DBGLevel = 0)
+BEGIN {}
+PROCESS
+{
+	# Get and store the function Name.
+	$fn = GetFunctionName
+
+	try
+	{		
+		# Enter routine.
+		# Use information from $global:PIVisionConfiguration whenever possible to 
+		# focus on validation simplify logic.	
+	}
+	catch
+	{
+		# Return the error message.
+		$msg = "A problem occurred during the processing of the validation check"
+		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_
+		$result = "N/A"
+	}
+
+	# Define the results in the audit table
 	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
 									-at $AuditTable "AU1xxxx" `
 									-ain "<Name>" -aiv $result `
 									-aif $fn -msg $msg `
 									-Group1 "<Category 1>" -Group2 "<Category 2>" `
 									-Group3 "<Category 3>" -Group4 "<Category 4>" `
-									-Severity "<Severity>"																																																
+									-Severity "<Severity>"
 }
 
 END {}
@@ -739,6 +884,7 @@ Export-ModuleMember Get-PISysAudit_CheckPIVisionVersion
 Export-ModuleMember Get-PISysAudit_CheckPIVisionAppPools
 Export-ModuleMember Get-PISysAudit_CheckPIVisionSSL
 Export-ModuleMember Get-PISysAudit_CheckPIVisionSPN
+Export-ModuleMember Get-PISysAudit_CheckPIVisionHeaders
 # </Do not remove>
 
 # ........................................................................

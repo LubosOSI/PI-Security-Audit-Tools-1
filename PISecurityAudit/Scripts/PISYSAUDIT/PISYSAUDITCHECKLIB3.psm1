@@ -1,9 +1,4 @@
-# ***********************************************************************
-# Validation library
-# ***********************************************************************
-# * Modulename:   PISYSAUDIT
-# * Filename:     PISYSAUDITCHECKLIB3.psm1
-# * Description:  Validation rules for PI AF Server.
+# ************************************************************************
 # *
 # * Copyright 2016 OSIsoft, LLC
 # * Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,15 +13,6 @@
 # * See the License for the specific language governing permissions and
 # * limitations under the License.
 # *
-# * Modifications copyright (C) <YYYY> <Name>, <Org>
-# * <Description of modification>
-# *
-# ************************************************************************
-# Version History:
-# ------------------------------------------------------------------------
-# Version 1.0.0.8 Initial release on OSIsoft Users Community.
-# Authors:  Jim Davidson, Bryan Owen and Mathieu Hamel from OSIsoft.
-#
 # ************************************************************************
 
 # ........................................................................
@@ -163,7 +149,7 @@ impersonation for access to external tables.  This setting can be changed by
 running the AFDiag utility with the 
 /ExternalDataTablesAllowNonImpersonatedUsers- flag.  For more information, see 
 "AFDiag utility parameters" in the PI Live Library: <br/>
-<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-7092DD14-7901-4D63-8B9D-4414C569EA5F">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-7092DD14-7901-4D63-8B9D-4414C569EA5F </a>
+<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v10/GUID-7092DD14-7901-4D63-8B9D-4414C569EA5F">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v10/GUID-7092DD14-7901-4D63-8B9D-4414C569EA5F </a>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(							
@@ -304,76 +290,75 @@ PROCESS
 	$msg = ""
 	try
 	{										
-		$ServiceName = 'afservice'
-		$ServiceAccount = Get-PISysAudit_ServiceProperty -sn $ServiceName -sp LogOnAccount -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel
-		# No need to check specific privileges if the service account is an admin.
-		$IsServiceAccountLocalAdmin = Get-PISysAudit_GroupMembers -GroupName "Administrators" -GroupDomain "local" -LocalComputer $LocalComputer -RemoteComputerName $RemoteComputerName -CheckUser $ServiceAccount
-		if($ServiceAccount.ToLower() -eq $('nt service\' + $ServiceName))
+		$IsElevated = (Get-Variable "PISysAuditIsElevated" -Scope "Global" -ErrorAction "SilentlyContinue").Value
+		# Verify running elevated.
+		if(-not($IsElevated))
 		{
-			$result = $true
-			$msg = "The service account is the default virtual account."
+			$msg = "Elevation required to check process privilege.  Run Powershell as Administrator to complete this check"
+			Write-PISysAudit_LogMessage $msg "Warning" $fn
+			$result = "N/A"
 		}
-		elseif($IsServiceAccountLocalAdmin)
+		elseif($ExecutionContext.SessionState.LanguageMode -eq "ConstrainedLanguage")
 		{
-			$result = $false
-			$msg = "The service account is in the local Administrators group."
+			$msg = "Constrained Language Mode detected.  This check will be skipped"
+			Write-PISysAudit_LogMessage $msg "Warning" $fn
+			$result = "N/A"
 		}
 		else
 		{
-			$IsElevated = (Get-Variable "PISysAuditIsElevated" -Scope "Global" -ErrorAction "SilentlyContinue").Value
-			# Verify running elevated.
-			if($LocalComputer -and (-not $IsElevated))
-			{
-				$msg = "Elevation required to check process privileges.  Run Powershell as Administrator to complete this check"
-				Write-PISysAudit_LogMessage $msg "Warning" $fn
-				$result = "N/A"
-			}
-			else
-			{
-				# Initialize objects.
-				$securityWeaknessCounter = 0	
-				$securityWeakness = $false
-				$privilegeFound = $false		
+			# Initialize objects.
+			$securityWeaknessCounter = 0	
+			$securityWeakness = $false
+			$privilegeFound = $false		
 		
-				# Get the service account.
-				$listOfPrivileges = Get-PISysAudit_CheckPrivilege -lc $LocalComputer -rcn $RemoteComputerName -an $ServiceAccount -dbgl $DBGLevel					
+			# Get the service account.
+			$listOfPrivileges = Get-PISysAudit_ServicePrivilege -lc $LocalComputer -rcn $RemoteComputerName -sn "AFService" -dbgl $DBGLevel					
+		
+			# Read each line to find granted privileges.		
+			foreach($line in $listOfPrivileges)
+			{											
+				# Reset.
+				$securityWeakness = $false						
+				$privilegeFound = $false			
+			
+				# Skip any line not starting with 'SE'
+				if($line.ToUpper().StartsWith("SE")) 
+				{								
+					# Validate that the tokens contains these privileges.
+					if($line.ToUpper().Contains("SEDEBUGPRIVILEGE")) { $privilegeFound = $true }
+					if($line.ToUpper().Contains("SETAKEOWNERSHIPPRIVILEGE")) { $privilegeFound = $true }
+					if($line.ToUpper().Contains("SETCBPRIVILEGE")) { $privilegeFound = $true }
 				
-				if($null -ne $listOfPrivileges)
+					# Validate that the privilege is enabled, if yes a weakness was found.
+					if($privilegeFound -and ($line.ToUpper().Contains("ENABLED"))) { $securityWeakness = $true }
+				}							
+
+				# Increment the counter if a weakness has been discovered.
+				if($securityWeakness)
 				{
-					# Read each line to find granted privileges.		
-					foreach($line in $listOfPrivileges)
-					{											
-						# Reset.					
-						$privilegeFound = $false			
-					
-						# Skip any line not starting with 'SE'
-						if($line.ToUpper().StartsWith("SE")) 
-						{								
-							# Validate that the tokens contains these privileges.
-							if($line.ToUpper().Contains("SEDEBUGPRIVILEGE")) { $privilegeFound = $true }
-							if($line.ToUpper().Contains("SETAKEOWNERSHIPPRIVILEGE")) { $privilegeFound = $true }
-							if($line.ToUpper().Contains("SETCBPRIVILEGE")) { $privilegeFound = $true }
-							if($privilegeFound){
-								$result = $false
-								$msg = $msg + ", " + $line.ToUpper()
-							}
-						}						
-					}	
-					if($result -eq $false)
-					{
-						$msg = "The account has the following privileges: " + $msg + "." 
-					}
-					else 
-					{ 
-						$msg = "No weaknesses were detected."
-					}
-				}
+					$securityWeaknessCounter++
+				
+					# Store the privilege found that might compromise security.
+					if($securityWeaknessCounter -eq 1)
+					{ $msg = $line.ToUpper() }
+					else
+					{ $msg = $msg + ", " + $line.ToUpper() }
+				}					
+			}
+		
+			# Check if the counter is 0 = compliant, 1 or more it is not compliant		
+			if($securityWeaknessCounter -gt 0)
+			{
+				$result = $false
+				if($securityWeaknessCounter -eq 1)
+				{ $msg = "The following privilege: " + $msg + " is enabled." }
 				else
-				{
-					$result = "N/A"
-					$msg = "Unable to complete AF Server service privilege check."
-				}
-				
+				{ $msg = "The following privileges: " + $msg + " are enabled." }
+			}
+			else 
+			{ 
+				$result = $true 
+				$msg = "No weaknesses were detected."
 			}
 		}	
 	}
@@ -412,7 +397,7 @@ COMPLIANCE: Set the Configuration Setting PlugInVerifyLevel to RequireSigned
 or RequireSignedTrustedProvider. This can be done with AFDiag 
 /PluginVerifyLevel:<Level>. For more information, see "AFDiag utility 
 parameters" in the PI Live Library: <br/>
-<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-7092DD14-7901-4D63-8B9D-4414C569EA5F">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-7092DD14-7901-4D63-8B9D-4414C569EA5F </a>
+<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v10/GUID-7092DD14-7901-4D63-8B9D-4414C569EA5F">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v10/GUID-7092DD14-7901-4D63-8B9D-4414C569EA5F </a>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(							
@@ -498,11 +483,16 @@ function Get-PISysAudit_CheckFileExtensionWhitelist
 AU30005 - PI AF Server File Extension Whitelist
 .DESCRIPTION
 VALIDATION: Verifies file extension whitelist for PI AF. <br/>
-COMPLIANCE: Set the Configuration Setting FileExtensions to only include the 
+COMPLIANCE: Set the FileExtensions configuration setting to only include the 
 file extensions: docx:xlsx:csv:pdf:txt:rtf:jpg:jpeg:png:svg:tiff:gif or a 
 subset thereof. This can be done with AFDiag /FileExtensions:<ExtensionList>. 
 For more information, see "AFDiag utility parameters" in the PI Live Library: <br/>
-<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-7092DD14-7901-4D63-8B9D-4414C569EA5F">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-7092DD14-7901-4D63-8B9D-4414C569EA5F </a>
+<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v10/GUID-7092DD14-7901-4D63-8B9D-4414C569EA5F">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v10/GUID-7092DD14-7901-4D63-8B9D-4414C569EA5F </a><br/>
+By default, the only noncompliant extension included is PDI, which corresponds
+to PI ProcessBook displays. Caution is recommended with PDI files as they can
+contain VBA Macros. Clients are encouraged to leverage Macro Protection with
+PI ProcessBook. For more information, see "Macro protection" in the Live Library: <br/>
+<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/processbook-v4/GUID-312C3C85-B06D-4271-AE9D-4FE08E093137">https://livelibrary.osisoft.com/LiveLibrary/content/en/processbook-v4/GUID-312C3C85-B06D-4271-AE9D-4FE08E093137</a>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(							
@@ -573,7 +563,7 @@ PROCESS
 							# If we detect any rogue extension, the validation check fails, no need to look further
 							if($result -eq $false) 
 							{
-								$msg = "Setting contains non-compliant extenions."
+								$msg = "Setting contains non-compliant extensions."
 								break
 							}
 						} 
@@ -622,7 +612,7 @@ page for the latest version and associated documentation:<br/>
 <a href="https://techsupport.osisoft.com/Products/PI-Server/PI-AF">https://techsupport.osisoft.com/Products/PI-Server/PI-AF </a><br/>
 For more information on the upgrade procedure, see "PI AF Server upgrades" in 
 the PI Live Library: <br/>
-<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-CF854B20-29C7-4A5A-A303-922B74CE03C6">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-CF854B20-29C7-4A5A-A303-922B74CE03C6 </a><br/>
+<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v10/GUID-CF854B20-29C7-4A5A-A303-922B74CE03C6">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v10/GUID-CF854B20-29C7-4A5A-A303-922B74CE03C6 </a><br/>
 Associated security bulletins:<br/>
 <a href="https://techsupport.osisoft.com/Products/PI-Server/PI-AF/Alerts">https://techsupport.osisoft.com/Products/PI-Server/PI-AF/Alerts</a>
 #>
@@ -729,7 +719,7 @@ VALIDATION: Checks PI AF Server SPN assignment.<br/>
 COMPLIANCE: PI AF Server SPNs exist and are assigned to the AF Service account. 
 This makes Kerberos Authentication possible. For more information, see "PI AF 
 and Kerberos authentication" in the PI Live Library: <br/>
-<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-531FFEC4-9BBB-4CA0-9CE7-7434B21EA06D">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-531FFEC4-9BBB-4CA0-9CE7-7434B21EA06D</a>
+<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v10/GUID-531FFEC4-9BBB-4CA0-9CE7-7434B21EA06D">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v10/GUID-531FFEC4-9BBB-4CA0-9CE7-7434B21EA06D</a>
 #>
 
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
@@ -809,7 +799,7 @@ server level. That identity should have a single custom account or group mapped
 to it. Admin rights at the server level should not be necessary for ordinary 
 administration tasks. For more information, see "PI AF Access rights" in the PI
 Live Library: <br/>
-<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-23016CF4-6CF1-4904-AAEC-418EEB00B399">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-23016CF4-6CF1-4904-AAEC-418EEB00B399</a>
+<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v10/GUID-23016CF4-6CF1-4904-AAEC-418EEB00B399">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v10/GUID-23016CF4-6CF1-4904-AAEC-418EEB00B399</a>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(							
@@ -848,93 +838,109 @@ PROCESS
 				# Get identities with Admin Right on the AF Server object
 				$afAdminIdentities = @()
 				$afAdminIdentities += Get-AFSecurity -AFObject $afserver `
-											| ForEach-Object {if($_.Rights -like '*Admin*'){$_}} `
+											| ForEach-Object {if($_.Rights -like '*Admin*' -or $_.Rights -like '*All*'){$_}} `
 											| Select-Object -ExpandProperty Identity
-				# Flag if more than one Identity is an AF super user 
-				$hasSingleIdentity = $false
-				If($afAdminIdentities.Count -eq 1){ $hasSingleIdentity = $true }
-
-				# Find all mappings to super user identities. 
-				$afAdminMappings = @()
-				$afAdminMappings += Get-AFSecurityMapping -AFServer $afserver `
-											| ForEach-Object {if($_.SecurityIdentity -in $afAdminIdentities){$_}} `
-											| Select-Object Name, SecurityIdentity, Account
-				# Flag if more than one mapping exists to the AF super user 
-				$hasSingleMapping = $false
-				If($afAdminMappings.Count -eq 1){ $hasSingleMapping = $true }
-
-				$endUserMappings = @{}
-				$osAdminMappings = @{}
-				$wellKnownMappings = @{}
-				ForEach($afAdminMapping in $afAdminMappings)
+				if($afAdminIdentities.Count -eq 0)
 				{
-					$accountType = Test-PISysAudit_PrincipalOrGroupType -SID $afAdminMapping.Account 
-			
-					If($null -ne $accountType){
-						switch ($accountType)
-						{
-							'LowPrivileged' {
-												$endUserMappings.Add($afAdminMapping.Name, $afAdminMapping.SecurityIdentity)
-												$wellKnownMappings.Add($afAdminMapping.Name, $afAdminMapping.SecurityIdentity)
-											}
-							'Administrator' {
-												$osAdminMappings.Add($afAdminMapping.Name, $afAdminMapping.SecurityIdentity)
-												$wellKnownMappings.Add($afAdminMapping.Name, $afAdminMapping.SecurityIdentity)
-											}
-							default {$wellKnownMappings.Add($afAdminMapping.Name, $afAdminMapping.SecurityIdentity)}
-						}
-					}
+					$result = $true
+				    $msg = "No AF Identity has AF Server level Admin rights. Consider adding a single identity for disaster recovery."
 				}
-
-				if($wellKnownMappings.Count -eq 0) # Check for well known mappings first
+				else
 				{
-					if($hasSingleMapping) # Ideal case, a single compliant mapping
+					# Flag if more than one Identity is an AF super user 
+					$hasSingleIdentity = $false
+					If($afAdminIdentities.Count -eq 1){ $hasSingleIdentity = $true }
+
+					# Find all mappings to super user identities. 
+					$afAdminMappings = @()
+					$afAdminMappings += Get-AFSecurityMapping -AFServer $afserver `
+												| ForEach-Object {if($_.SecurityIdentity -in $afAdminIdentities){$_}} `
+												| Select-Object Name, SecurityIdentity, Account
+					if($afAdminMappings.Count -eq 0)
 					{
 						$result = $true
-						$msg = "A single AF Identity has AF Admin rights and that AF Identity has a single mapping to a custom group."
-					}
-					else # One Identity but multiple mappings which may not be necessary
-					{
-						$result = $false
-						$Severity = 'Low'
-						if($hasSingleIdentity)
-						{
-							$msg = "Multiple Windows Principals mapped to an AF Identity with Admin rights.  Evaluate whether Admin rights are necessary for: "
-							foreach ($afAdminMapping in $afAdminMappings) { $msg += " Mapping-" + $afAdminMapping.Name + '; AF Identity-' + $afAdminMapping.SecurityIdentity + "|" }
-						}
-						else # Multiple Identities should not have super user access
-						{
-							$msg = "Multiple AF Identities have AF Admin rights.  Evaluate whether Admin rights are necessary for: "	
-							foreach ($afAdminIdentity in $afAdminIdentities) { $msg += " AF Identity-" + $afAdminIdentity.Name + "|" }
-						}
-					}	
-				}
-				else # Evaluate well known accounts for severity
-				{
-					$result = $false
-					if($endUserMappings.Count -gt 0) # RED ALERT if super user rights are granted to end user groups like Everyone or Domain Users
-					{
-						$Severity = 'High'
-						$msg = "End user account(s) are mapped to an AF Identities with AF Admin rights:"
-						$priorityMappings = $endUserMappings
+						$msg = "No AF Mappings involve an AF Identity with AF Server level Admin rights. Consider adding a mapping for a single identity for disaster recovery."
 					}
 					else
 					{
-						$Severity = 'Medium'
-						if($osAdminMappings.Count -gt 0)
+						# Flag if more than one mapping exists to the AF super user 
+						$hasSingleMapping = $false
+						If($afAdminMappings.Count -eq 1){ $hasSingleMapping = $true }
+
+						$endUserMappings = @{}
+						$osAdminMappings = @{}
+						$wellKnownMappings = @{}
+						ForEach($afAdminMapping in $afAdminMappings)
 						{
-							$msg = "Default Administrator account(s) are mapped to an AF Identities with AF Admin rights:"
-							$priorityMappings = $osAdminMappings
+							$accountType = Test-PISysAudit_PrincipalOrGroupType -SID $afAdminMapping.Account 
+			
+							If($null -ne $accountType){
+								switch ($accountType)
+								{
+									'LowPrivileged' {
+														$endUserMappings.Add($afAdminMapping.Name, $afAdminMapping.SecurityIdentity)
+														$wellKnownMappings.Add($afAdminMapping.Name, $afAdminMapping.SecurityIdentity)
+													}
+									'Administrator' {
+														$osAdminMappings.Add($afAdminMapping.Name, $afAdminMapping.SecurityIdentity)
+														$wellKnownMappings.Add($afAdminMapping.Name, $afAdminMapping.SecurityIdentity)
+													}
+									default {$wellKnownMappings.Add($afAdminMapping.Name, $afAdminMapping.SecurityIdentity)}
+								}
+							}
 						}
-						else
+
+						if($wellKnownMappings.Count -eq 0) # Check for well known mappings first
 						{
-							$msg = "Well known principals are mapped to an AF Identities with AF Admin rights, this could lead to unintentional privileged access:"
-							$priorityMappings = $wellKnownMappings
+							if($hasSingleMapping) # Ideal case, a single compliant mapping
+							{
+								$result = $true
+								$msg = "A single AF Identity has AF Admin rights and that AF Identity has a single mapping to a custom group."
+							}
+							else # One Identity but multiple mappings which may not be necessary
+							{
+								$result = $false
+								$Severity = 'Low'
+								if($hasSingleIdentity)
+								{
+									$msg = "Multiple Windows Principals mapped to an AF Identity with Admin rights.  Evaluate whether Admin rights are necessary for: "
+									foreach ($afAdminMapping in $afAdminMappings) { $msg += " Mapping-" + $afAdminMapping.Name + '; AF Identity-' + $afAdminMapping.SecurityIdentity + "|" }
+								}
+								else # Multiple Identities should not have super user access
+								{
+									$msg = "Multiple AF Identities have AF Admin rights.  Evaluate whether Admin rights are necessary for: "	
+									foreach ($afAdminIdentity in $afAdminIdentities) { $msg += " AF Identity-" + $afAdminIdentity.Name + "|" }
+								}
+							}	
 						}
+						else # Evaluate well known accounts for severity
+						{
+							$result = $false
+							if($endUserMappings.Count -gt 0) # RED ALERT if super user rights are granted to end user groups like Everyone or Domain Users
+							{
+								$Severity = 'High'
+								$msg = "End user account(s) are mapped to an AF Identities with AF Admin rights:"
+								$priorityMappings = $endUserMappings
+							}
+							else
+							{
+								$Severity = 'Medium'
+								if($osAdminMappings.Count -gt 0)
+								{
+									$msg = "Default Administrator account(s) are mapped to an AF Identities with AF Admin rights:"
+									$priorityMappings = $osAdminMappings
+								}
+								else
+								{
+									$msg = "Well known principals are mapped to an AF Identities with AF Admin rights, this could lead to unintentional privileged access:"
+									$priorityMappings = $wellKnownMappings
+								}
+							}
+							foreach($priorityMapping in $priorityMappings.GetEnumerator()) { $msg += " Mapping-" + $priorityMapping.Key + '; AF Identity-' + $priorityMapping.Value.Name + "|" }
+						}
+						$msg = $msg.Trim('|')
 					}
-					foreach($priorityMapping in $priorityMappings.GetEnumerator()) { $msg += " Mapping-" + $priorityMapping.Key + '; AF Identity-' + $priorityMapping.Value.Name + "|" }
-				}
-				$msg = $msg.Trim('|')
+				} 
 			}
 			else
 			{
@@ -1086,7 +1092,7 @@ COMPLIANCE: Ensure that the World Identity is disabled on the AF Server.
 Alternatively, remove the mapping to the \Everyone group and re-map it to an 
 appropriate group with only users who need access to PI AF.  For more 
 information on default PI AF Identities, see:
-<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v9/GUID-748615A9-8A01-46EB-A907-00353D5AFBE0">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v9/GUID-748615A9-8A01-46EB-A907-00353D5AFBE0</a>
+<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v10/GUID-748615A9-8A01-46EB-A907-00353D5AFBE0">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v10/GUID-748615A9-8A01-46EB-A907-00353D5AFBE0</a>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(							
@@ -1211,7 +1217,7 @@ COMPLIANCE: Database level write access should not be granted to any well-known,
 end user groups, such as \Everyone or Domain Users. Similarly, write access to 
 analyses should be limited. For more information on PI AF access writes, please 
 see: 
-<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v9/GUID-23016CF4-6CF1-4904-AAEC-418EEB00B399<br/>">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v9/GUID-23016CF4-6CF1-4904-AAEC-418EEB00B399</a>
+<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v10/GUID-23016CF4-6CF1-4904-AAEC-418EEB00B399 ">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v10/GUID-23016CF4-6CF1-4904-AAEC-418EEB00B399</a><br/>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(							
@@ -1264,7 +1270,15 @@ PROCESS
 				$databases = $con.Databases
 				foreach($db in $databases)
 				{
-					$dbAccess = Get-AFSecurity -AFObject $db
+					if($db.Name -eq "Configuration")
+                    {
+                        # Configuration database ACL should be evaluated at the OSIsoft element. 
+                        $dbAccess = Get-AFSecurity -AFObject (Get-AFElement -AFDatabase $db -Name "OSIsoft")
+                    }
+                    else
+                    {
+                        $dbAccess = Get-AFSecurity -AFObject $db
+                    }
 					$tempIDs = $dbAccess | Where-Object { $_.AllowAccess -eq 'True' -and $_.Rights -match 'Write|Admin|All'}
 					foreach($ID in $tempIDs)
 					{

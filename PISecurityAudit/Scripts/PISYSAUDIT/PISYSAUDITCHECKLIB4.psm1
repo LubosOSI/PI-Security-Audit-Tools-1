@@ -1,9 +1,4 @@
-# ***********************************************************************
-# Validation library
-# ***********************************************************************
-# * Modulename:   PISYSAUDIT
-# * Filename:     PISYSAUDITCHECKLIB4.psm1
-# * Description:  Validation rules for SQL Server.
+# ************************************************************************
 # *
 # * Copyright 2016 OSIsoft, LLC
 # * Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,15 +13,6 @@
 # * See the License for the specific language governing permissions and
 # * limitations under the License.
 # *
-# * Modifications copyright (C) <YYYY> <Name>, <Org>
-# * <Description of modification>
-# *
-# ************************************************************************
-# Version History:
-# ------------------------------------------------------------------------
-# Version 1.0.0.8 Initial release on OSIsoft Users Community.
-# Authors:  Jim Davidson, Bryan Owen and Mathieu Hamel from OSIsoft.
-#
 # ************************************************************************
 
 # ........................................................................

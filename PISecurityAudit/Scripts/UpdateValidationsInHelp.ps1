@@ -13,9 +13,6 @@
 # * See the License for the specific language governing permissions and
 # * limitations under the License.
 # *
-# * Modifications copyright (C) <YYYY> <Name>, <Org>
-# * <Description of modification>
-# *
 # ************************************************************************
 
 # Reload the module to make sure you are using the latest
@@ -50,7 +47,8 @@ foreach ($line in $helpFile)
             $libs += Get-PISysAudit_FunctionsFromLibrary2 
             $libs += Get-PISysAudit_FunctionsFromLibrary3 
             $libs += Get-PISysAudit_FunctionsFromLibrary4 
-            $libs += Get-PISysAudit_FunctionsFromLibrary5 
+            $libs += Get-PISysAudit_FunctionsFromLibrary5
+            $libs += Get-PISysAudit_FunctionsFromLibrary6
 
             foreach ($lib in $libs)
             {

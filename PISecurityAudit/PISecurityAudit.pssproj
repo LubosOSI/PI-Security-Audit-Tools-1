@@ -45,6 +45,7 @@
     <Compile Include="Scripts\PISYSAUDIT\PISYSAUDITCHECKLIB6.psm1" />
     <Compile Include="Scripts\PISYSAUDIT\PISYSAUDITCORE.psm1" />
     <Compile Include="Scripts\UpdateValidationsInHelp.ps1" />
+    <Compile Include="Scripts\Utilities\CheckProcessPrivilege.ps1" />
     <Compile Include="Scripts\Utilities\PIVISIONKERBEROSCONFIGURATION.psm1" />
     <Compile Include="Scripts\Utilities\PISECCONFIGEXPORT.psm1" />
     <Compile Include="Testing\ExecutePester.ps1" />

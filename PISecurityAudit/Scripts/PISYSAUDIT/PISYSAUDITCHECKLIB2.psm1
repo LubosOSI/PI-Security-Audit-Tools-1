@@ -1,9 +1,4 @@
-# ***********************************************************************
-# Validation library
-# ***********************************************************************
-# * Modulename:   PISYSAUDIT
-# * Filename:     PISYSAUDITCHECKLIB2.psm1
-# * Description:  Validation rules for PI Data Archive.
+# ************************************************************************
 # *
 # * Copyright 2016 OSIsoft, LLC
 # * Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,15 +13,6 @@
 # * See the License for the specific language governing permissions and
 # * limitations under the License.
 # *
-# * Modifications copyright (C) <YYYY> <Name>, <Org>
-# * <Description of modification>
-# *
-# ************************************************************************
-# Version History:
-# ------------------------------------------------------------------------
-# Version 1.0.0.8 Initial release on OSIsoft Users Community.
-# Authors:  Jim Davidson, Bryan Owen and Mathieu Hamel from OSIsoft.
-#
 # ************************************************************************
 
 # ........................................................................
@@ -68,6 +54,7 @@ param(
 	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckTransportSecurity"                    2 "AU20012"
 	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPIBackup"                             1 "AU20013"
 	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckInvalidConnections"                   2 "AU20014"
+	$listOfFunctions += NewAuditFunction "Get-PISysAudit_CheckPINetworkManagerConfiguredAccount"	1 "AU20015"
 				
 	# Return all items at or below the specified AuditLevelInt
 	return $listOfFunctions | Where-Object Level -LE $AuditLevelInt
@@ -509,7 +496,7 @@ Archive product page for the latest version and associated documentation:<br/>
 For more information on the upgrade procedure, see the "Upgrade a PI Data 
 Archive Server" section of the PI Data Archive Installation and Upgrade Guide, 
 in Live Library: <br/>
-<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v8/GUID-0BDEB1F5-C72F-4865-91F7-F3D38A2975BD ">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v8/GUID-0BDEB1F5-C72F-4865-91F7-F3D38A2975BD </a><br/>
+<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v10/GUID-0BDEB1F5-C72F-4865-91F7-F3D38A2975BD ">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v10/GUID-0BDEB1F5-C72F-4865-91F7-F3D38A2975BD </a><br/>
 Associated security bulletins:<br/>
 <a href="https://techsupport.osisoft.com/Products/PI-Server/PI-Data-Archive/Alerts">https://techsupport.osisoft.com/Products/PI-Server/PI-Data-Archive/Alerts</a>
 #>
@@ -597,7 +584,7 @@ past days where events can be modified in the Snapshot or Archive databases. A
 zero value means no time check is done.  For instructions to set EditDays, see 
 "Modify the EditDays tuning parameter" section in the PI Data Archive System 
 Management Guide:<br/>
-<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-0865CC31-BF8C-4347-B717-15071ED51399 ">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-0865CC31-BF8C-4347-B717-15071ED51399 </a>
+<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v10/GUID-0865CC31-BF8C-4347-B717-15071ED51399 ">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v10/GUID-0865CC31-BF8C-4347-B717-15071ED51399 </a>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(							
@@ -1006,7 +993,7 @@ COMPLIANCE: PI Data Archive SPNs exist and are assigned to the account running
 pinetmgr. Presently only local system is supported.  Correct SPN assignment 
 makes Kerberos Authentication possible.  For more information, see "PI and 
 Kerberos authentication" in the PI Live Library. <br/>
-<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-531FFEC4-9BBB-4CA0-9CE7-7434B21EA06D">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-531FFEC4-9BBB-4CA0-9CE7-7434B21EA06D </a>
+<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v10/GUID-531FFEC4-9BBB-4CA0-9CE7-7434B21EA06D">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v10/GUID-531FFEC4-9BBB-4CA0-9CE7-7434B21EA06D </a>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(							
@@ -1281,7 +1268,7 @@ VALIDATION: Checks that PI Firewall is used. <br/>
 COMPLIANCE: The default PI Firewall rule of "Allow *.*.*.*" should be removed 
 and replaced with specific IPs or subnets that may connect to the PI Data 
 Archive. For more information on PI Firewall, see: 
-<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v8/GUID-14FC1696-D64B-49B0-96ED-6EEF3CE92DCB ">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v8/GUID-14FC1696-D64B-49B0-96ED-6EEF3CE92DCB </a> <br/>
+<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v10/GUID-14FC1696-D64B-49B0-96ED-6EEF3CE92DCB ">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v10/GUID-14FC1696-D64B-49B0-96ED-6EEF3CE92DCB </a> <br/>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(							
@@ -1374,6 +1361,11 @@ supported version:
 	+ PI AF SDK (all versions)
 For more information, see: 
 <a href="https://techsupport.osisoft.com/Troubleshooting/KB/KB01092">https://techsupport.osisoft.com/Troubleshooting/KB/KB01092</a> <br/>
+To query for all connections with the security status and ciphers used, 
+leverage the Export-PISecConfig cmdlet with the DataItem parameter set to 
+PINetManagerStats.  
+Export-PISecConfig -PIDataArchiveComputerName myServer -DataItem PINetManagerStats
+For more information, use "Get-Help Export-PISecConfig -Full".
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(							
@@ -1492,10 +1484,13 @@ AU20013 - PI Backup Configured
 .DESCRIPTION
 VALIDATION: Ensures that PI Backups are configured and current. <br/>
 COMPLIANCE: Configure PI Backup to back up PI Data Archive configuration and 
-data daily. It is best practice to back up to a local disk on the PI Data
-Archive machine, then copy the backup to an off-machine location. For more 
-information, see:
-<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v8/GUID-8F56FDA9-505C-4868-8483-E51435E80A61">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v8/GUID-8F56FDA9-505C-4868-8483-E51435E80A61</a><br/>
+data daily. Ad hoc backups with PI SMT or with the pibackup.bat script with 
+type COPY will register as not compliant because they do not update the 
+LastBackupTime attribute, and will not be detected. Incremental backups as
+installed by pibackup.bat update the LastBackupTime. It is best practice to 
+back up to a local disk on the PI Data Archive machine, then copy the backup 
+to an off-machine location. For more information, see:
+<a href="https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v10/GUID-8F56FDA9-505C-4868-8483-E51435E80A61">https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v10/GUID-8F56FDA9-505C-4868-8483-E51435E80A61</a><br/>
 #>
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(							
@@ -1540,7 +1535,7 @@ PROCESS
 					# Good recent backup found, check file coverage
 					if($null -ne $archiveList)
 					{
-						$arcsNotBackedUp = $archiveList | Where-Object { $null -eq $_.LastBackupTime }
+						$arcsNotBackedUp = $archiveList | Where-Object { $null -eq $_.LastBackupTime -and $_.TotalEvents -ne 0 }
 						if($arcsNotBackedUp.Count -eq 0)
 						{
 							$result = $true
@@ -1781,6 +1776,112 @@ END {}
 #***************************
 }
 
+function Get-PISysAudit_CheckPINetworkManagerConfiguredAccount
+{
+<#  
+.SYNOPSIS
+AU20015 -  - PI Network Manager Service Account
+.DESCRIPTION
+VALIDATION: Verifies that PI Data Archive version is greater than 2017 R2
+and the PI Network Manager application service is running as the account NT Service\PINetMgr.
+If PI Data Archive version is less than 2017 R2, PI Network Manager Application Service 
+will run as Local System by default.
+COMPLIANCE: Run the PI Network Manager Application service as default account
+NT Service\PINetMgr with PI Data Archive version greater than 2017 R2.
+#>
+[CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
+param(							
+		[parameter(Mandatory=$true, Position=0, ParameterSetName = "Default")]
+		[alias("at")]
+		[System.Collections.HashTable]
+		$AuditTable,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("lc")]
+		[boolean]
+		$LocalComputer = $true,
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("rcn")]
+		[string]
+		$RemoteComputerName = "",
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("dbgl")]
+		[int]
+		$DBGLevel = 0)		
+BEGIN {}
+PROCESS
+{		
+	# Get and store the function Name.
+	$fn = GetFunctionName
+	$msg = ""
+	$Severity = "Unknown"
+	try
+	{
+		# Update these for subsequent releases
+		$latestVersion = '3.4.415.1188'
+		$readable = '2017 R2A'
+
+		$installationVersion = $global:PIDataArchiveConfiguration.Connection.ServerVersion.ToString()
+		$versionInt = [int]($installationVersion -replace '\.', '')
+		$latestInt = [int]($latestVersion -replace '\.', '')
+		
+		if($versionInt -lt $latestInt)
+		{
+			$result = $false
+			$Severity = "High"
+			$msg = "Upgrading to PI Data Archive $readable ($latestVersion) is recommended."
+		}
+		else
+		{
+			try
+			{		
+				# Get the service account.
+				$value = Get-PISysAudit_ServiceProperty -sn 'pinetmgr' -sp LogOnAccount -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel
+		
+				# Check if the value is == NT Service\PINetMgr		
+				if($value.ToLower() -eq "nt service\pinetmgr") 
+				{
+					$result =  $true 
+					$msg = "PINetMgr is running as NT Service\PINetMgr"
+				} 
+				else 
+				{ 
+					$result = $false
+					$Severity = "High"
+					$msg = "PINetMgr is not running as NT Service\PINetMgr"
+				}			
+			}
+			catch
+			{
+				# Return the error message.
+				$msg = "A problem occurred during the processing of the validation check."					
+				Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_									
+				$result = "N/A"
+			}
+		}
+	}
+	catch
+	{
+		# Return the error message.
+		$msg = "A problem occurred during the processing of the validation check."					
+		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_									
+		$result = "N/A"
+	}	
+
+	# Define the results in the audit table		
+	$AuditTable = New-PISysAuditObject -lc $LocalComputer -rcn $RemoteComputerName `
+										-at $AuditTable "AU20015" `
+										-aif $fn -msg $msg `
+										-ain "Configured Account" -aiv $result `
+										-Group1 "PI System" -Group2 "PI Data Archive" `
+										-Severity "High"					
+}
+
+END {}
+
+#***************************
+#End of exported function
+#***************************
+}
 
 # ........................................................................
 # Add your cmdlet after this section. Don't forget to add an intruction
@@ -1867,6 +1968,7 @@ Export-ModuleMember Get-PISysAudit_CheckPIFirewall
 Export-ModuleMember Get-PISysAudit_CheckTransportSecurity
 Export-ModuleMember Get-PISysAudit_CheckPIBackup
 Export-ModuleMember Get-PISysAudit_CheckInvalidConnections
+Export-ModuleMember Get-PISysAudit_CheckPINetworkManagerConfiguredAccount
 # </Do not remove>
 
 # ........................................................................

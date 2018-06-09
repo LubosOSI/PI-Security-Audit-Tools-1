@@ -130,7 +130,7 @@ https://techsupport.osisoft.com/Products/PI-Server/PI-Data-Archive
 For more information on the upgrade procedure, see the "Upgrade a PI Data 
 Archive Server" section of the PI Data Archive Installation and Upgrade Guide, 
 in Live Library: 
-https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v8/GUID-0BDEB1F5-C72F-4865-91F7-F3D38A2975BD 
+https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v10/GUID-0BDEB1F5-C72F-4865-91F7-F3D38A2975BD 
 Associated security bulletins:
 https://techsupport.osisoft.com/Products/PI-Server/PI-Data-Archive/Alerts
 
@@ -141,7 +141,7 @@ past days where events can be modified in the Snapshot or Archive databases. A
 zero value means no time check is done.  For instructions to set EditDays, see 
 "Modify the EditDays tuning parameter" section in the PI Data Archive System 
 Management Guide:
-https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-0865CC31-BF8C-4347-B717-15071ED51399 
+https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v10/GUID-0865CC31-BF8C-4347-B717-15071ED51399 
 
 AU20005 - Auto Trust Configuration
 VALIDATION: Verifies that the autotrustconfig tuning parameter is set to create 
@@ -173,7 +173,7 @@ COMPLIANCE: PI Data Archive SPNs exist and are assigned to the account running
 pinetmgr. Presently only local system is supported.  Correct SPN assignment 
 makes Kerberos Authentication possible.  For more information, see "PI and 
 Kerberos authentication" in the PI Live Library. 
-https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-531FFEC4-9BBB-4CA0-9CE7-7434B21EA06D 
+https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v10/GUID-531FFEC4-9BBB-4CA0-9CE7-7434B21EA06D 
 
 AU20009 - PI Collective
 VALIDATION: Checks if the PI Data Archive is a member of a High Availability 
@@ -198,7 +198,7 @@ VALIDATION: Checks that PI Firewall is used.
 COMPLIANCE: The default PI Firewall rule of "Allow *.*.*.*" should be removed 
 and replaced with specific IPs or subnets that may connect to the PI Data 
 Archive. For more information on PI Firewall, see: 
-https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v8/GUID-14FC1696-D64B-49B0-96ED-6EEF3CE92DCB  
+https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v10/GUID-14FC1696-D64B-49B0-96ED-6EEF3CE92DCB  
 
 AU20013 - PI Backup Configured
 VALIDATION: Ensures that PI Backups are configured and current. 
@@ -206,7 +206,15 @@ COMPLIANCE: Configure PI Backup to back up PI Data Archive configuration and
 data daily. It is best practice to back up to a local disk on the PI Data
 Archive machine, then copy the backup to an off-machine location. For more 
 information, see:
-https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v8/GUID-8F56FDA9-505C-4868-8483-E51435E80A61
+https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v10/GUID-8F56FDA9-505C-4868-8483-E51435E80A61
+
+AU20015 -  - PI Network Manager Service Account
+VALIDATION: Verifies that PI Data Archive version is greater than 2017 R2
+and the PI Network Manager application service is running as the account NT Service\PINetMgr.
+If PI Data Archive version is less than 2017 R2, PI Network Manager Application Service 
+will run as Local System by default.
+COMPLIANCE: Run the PI Network Manager Application service as default account
+NT Service\PINetMgr with PI Data Archive version greater than 2017 R2.
 
 AU30001 - PI AF Server Service Account
 VALIDATION: Verifies that the AF Server application service is not running as 
@@ -226,7 +234,7 @@ impersonation for access to external tables.  This setting can be changed by
 running the AFDiag utility with the 
 /ExternalDataTablesAllowNonImpersonatedUsers- flag.  For more information, see 
 "AFDiag utility parameters" in the PI Live Library: 
-https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-7092DD14-7901-4D63-8B9D-4414C569EA5F 
+https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v10/GUID-7092DD14-7901-4D63-8B9D-4414C569EA5F 
 
 AU30003 - PI AF Server Service Access
 VALIDATION: Verifies that the PI AF application server service does not have 
@@ -242,15 +250,20 @@ COMPLIANCE: Set the Configuration Setting PlugInVerifyLevel to RequireSigned
 or RequireSignedTrustedProvider. This can be done with AFDiag 
 /PluginVerifyLevel:<Level>. For more information, see "AFDiag utility 
 parameters" in the PI Live Library: 
-https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-7092DD14-7901-4D63-8B9D-4414C569EA5F 
+https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v10/GUID-7092DD14-7901-4D63-8B9D-4414C569EA5F 
 
 AU30005 - PI AF Server File Extension Whitelist
 VALIDATION: Verifies file extension whitelist for PI AF. 
-COMPLIANCE: Set the Configuration Setting FileExtensions to only include the 
+COMPLIANCE: Set the FileExtensions configuration setting to only include the 
 file extensions: docx:xlsx:csv:pdf:txt:rtf:jpg:jpeg:png:svg:tiff:gif or a 
 subset thereof. This can be done with AFDiag /FileExtensions:<ExtensionList>. 
 For more information, see "AFDiag utility parameters" in the PI Live Library: 
-https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-7092DD14-7901-4D63-8B9D-4414C569EA5F 
+https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v10/GUID-7092DD14-7901-4D63-8B9D-4414C569EA5F 
+By default, the only noncompliant extension included is PDI, which corresponds
+to PI ProcessBook displays. Caution is recommended with PDI files as they can
+contain VBA Macros. Clients are encouraged to leverage Macro Protection with
+PI ProcessBook. For more information, see "Macro protection" in the Live Library: 
+https://livelibrary.osisoft.com/LiveLibrary/content/en/processbook-v4/GUID-312C3C85-B06D-4271-AE9D-4FE08E093137
 
 AU30006 - PI AF Server Version
 VALIDATION: Verifies PI AF Server version. 
@@ -259,7 +272,7 @@ page for the latest version and associated documentation:
 https://techsupport.osisoft.com/Products/PI-Server/PI-AF 
 For more information on the upgrade procedure, see "PI AF Server upgrades" in 
 the PI Live Library: 
-https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-CF854B20-29C7-4A5A-A303-922B74CE03C6 
+https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v10/GUID-CF854B20-29C7-4A5A-A303-922B74CE03C6 
 Associated security bulletins:
 https://techsupport.osisoft.com/Products/PI-Server/PI-AF/Alerts
 
@@ -268,7 +281,7 @@ VALIDATION: Checks PI AF Server SPN assignment.
 COMPLIANCE: PI AF Server SPNs exist and are assigned to the AF Service account. 
 This makes Kerberos Authentication possible. For more information, see "PI AF 
 and Kerberos authentication" in the PI Live Library: 
-https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-531FFEC4-9BBB-4CA0-9CE7-7434B21EA06D
+https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v10/GUID-531FFEC4-9BBB-4CA0-9CE7-7434B21EA06D
 
 AU30008 - PI AF Server Admin Right
 VALIDATION: Verifies PI AF Server Admin right on the server object is not set 
@@ -278,7 +291,7 @@ server level. That identity should have a single custom account or group mapped
 to it. Admin rights at the server level should not be necessary for ordinary 
 administration tasks. For more information, see "PI AF Access rights" in the PI
 Live Library: 
-https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v7/GUID-23016CF4-6CF1-4904-AAEC-418EEB00B399
+https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v10/GUID-23016CF4-6CF1-4904-AAEC-418EEB00B399
 
 AU30009 - AF Connection to SQL
 VERIFICATION: AF Service connects to the SQL Server with Windows 
@@ -294,7 +307,7 @@ COMPLIANCE: Ensure that the World Identity is disabled on the AF Server.
 Alternatively, remove the mapping to the \Everyone group and re-map it to an 
 appropriate group with only users who need access to PI AF.  For more 
 information on default PI AF Identities, see:
-https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v9/GUID-748615A9-8A01-46EB-A907-00353D5AFBE0
+https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v10/GUID-748615A9-8A01-46EB-A907-00353D5AFBE0
 
 AU30011 - Restrict Write Access
 VERIFICATION: Write access to objects should be limited to power users. 
@@ -302,7 +315,7 @@ COMPLIANCE: Database level write access should not be granted to any well-known,
 end user groups, such as \Everyone or Domain Users. Similarly, write access to 
 analyses should be limited. For more information on PI AF access writes, please 
 see: 
-https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v9/GUID-23016CF4-6CF1-4904-AAEC-418EEB00B399
+https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v10/GUID-23016CF4-6CF1-4904-AAEC-418EEB00B399
 
 AU40001 - SQL Server xp_CmdShell Check
 VALIDATION: Verifies that SQL Server does not have xp_CmdShell enabled.
@@ -371,7 +384,7 @@ product page for the latest version and associated documentation:
 https://techsupport.osisoft.com/Products/Visualization/PI-Vision/ 
 For more information on the upgrade procedure, see "Upgrade a PI Vision 
 installation" in the PI Live Library:
-https://livelibrary.osisoft.com/LiveLibrary/content/en/vision-v1/GUID-5CF8A863-E056-4B34-BB6B-8D4F039D8DA6
+https://livelibrary.osisoft.com/LiveLibrary/content/en/vision-v2/GUID-5CF8A863-E056-4B34-BB6B-8D4F039D8DA6
 Associated security bulletins:
 https://techsupport.osisoft.com/Products/Visualization/PI-Vision/Alerts
 
@@ -380,7 +393,7 @@ VALIDATION: checks PI Vision AppPool identity.
 COMPLIANCE: Use a custom domain account. Network Service is acceptable, but not
 ideal. For more information, see "Create a service account for PI Vision" in 
 the PI Live Library: 
-https://livelibrary.osisoft.com/LiveLibrary/content/en/vision-v1/GUID-A790D013-BAC8-405B-A017-33E55595B411
+https://livelibrary.osisoft.com/LiveLibrary/content/en/vision-v2/GUID-A790D013-BAC8-405B-A017-33E55595B411
 
 AU50003 - PI Vision SSL
 VALIDATION: Checks whether SSL is enabled and enforced on the PI Vision Web 
@@ -389,14 +402,68 @@ COMPLIANCE: A valid HTTPS binding is configured and only connections with SSL
 are allowed. The SSL certificate is issued by a Certificate Authority. For more 
 information, see "Configure Secure Sockets Layer (SSL) access" in the PI Live 
 Library: 
-https://livelibrary.osisoft.com/LiveLibrary/content/en/vision-v1/GUID-CB46B733-264B-48D3-9033-73D16B4DBD3B
+https://livelibrary.osisoft.com/LiveLibrary/content/en/vision-v2/GUID-CB46B733-264B-48D3-9033-73D16B4DBD3B
 
 AU50004 - PI Vision SPN
 VALIDATION: Checks PI Vision SPN assignment. 
 COMPLIANCE: HTTP or HOST SPNs exist and are assigned to the PI Vision AppPool 
 account. This makes Kerberos Authentication possible. For more information, 
 see the PI Live Library link below. 
-https://livelibrary.osisoft.com/LiveLibrary/content/en/vision-v1/GUID-68329569-D75C-406D-AE2D-9ED512E74D46
+https://livelibrary.osisoft.com/LiveLibrary/content/en/vision-v2/GUID-68329569-D75C-406D-AE2D-9ED512E74D46
+
+AU50005 - PI Vision HTTP Headers
+VALIDATION: Checks for recommended PI Vision HTTP response headers. 
+COMPLIANCE: Ensure that the default HTTP headers in PI Vision 2017 R2 are configured: 
+- X-Frame-Options: SAMEORIGIN 
+- X-Content-Type-Options: nosniff 
+- Referrer-Policy: no-referrer 
+- X-XSS-Protection: 1; mode=block 
+For more information on these headers, see KB01631: 
+http://techsupport.osisoft.com/Troubleshooting/KB/KB01631/
+
+AU60001 - PI Web API Version
+VALIDATION: Verifies PI Web API version.
+COMPLIANCE: Upgrade to the latest version of PI Web API. See the PI Web API 
+product page for the latest version and associated documentation:
+https://techsupport.osisoft.com/Products/Developer-Technologies/PI-Web-API/ 
+For more information on the upgrade procedure, see "PI Web API Installation" 
+in the PI Live Library:
+https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v10/GUID-1B8C5B9F-0CD5-4B98-9283-0F5801AB850B
+Associated security bulletins:
+https://techsupport.osisoft.com/Products/Developer-Technologies/PI-Web-API/Alerts
+
+AU60002 - PI Web API CSRF
+VALIDATION: Checks for enabled CSRF Defense in the PI Web API.
+COMPLIANCE: Verify that Cross-Site Request Forgery defense is enabled. This is 
+configured by setting "EnableCSRFDefense" to True on the PI Web API 
+configuration element. for more information, see AL00316:
+https://techsupport.osisoft.com/Troubleshooting/Alerts/AL00316
+
+AU60003 - PI Web API Debug Mode
+VALIDATION: Verifies that debug mode is disabled in the PI Web API. 
+COMPLIANCE: Disable debug mode in PI Web API 2017 R2 or later by setting the 
+DebugMode attribute to False in the PI Web API configuration element, if this 
+attribute exists. If the DebugMode attribute is not present, debug mode is 
+disabled by default. Debug mode should only be enabled for troubleshooting 
+purposes. For more information, see Live Library:
+https://livelibrary.osisoft.com/LiveLibrary/content/en/web-api-v9/GUID-E8BF02E2-77C1-40B1-9F1F-0637F94BB8B9
+
+AU60004 - PI Web API HTTP Headers
+VALIDATION: Verifies that best practices for HTTP headers are implemented
+in the PI Web API. 
+COMPLIANCE: Ensure that the X-Frame-Options header is set to enforce framing
+restrictions. Ensure that the Strict-Transport-Security header is set to enforce
+HTTP strict transport security (HSTS). For configuration steps, see Live Library: 
+https://livelibrary.osisoft.com/LiveLibrary/content/en/web-api-v9/GUID-5EB0EE2A-B2D0-44D5-935A-422E9FA574A8  
+For additional recommendations, see KB01631: 
+https://techsupport.osisoft.com/Troubleshooting/KB/KB01631/
+
+AU60005 - PI Web API CORS
+VALIDATION: Verifies that CORS origins are restricted to a whitelist of domains, if CORS is enabled. 
+COMPLIANCE: Ensure that the CORSOrigins attribute in the PI Web API configuration element
+is either empty (CORS disabled) or contains a list of allowed domains. Do not use CORSOrigins = *,
+as this allows cross-origin requests from any origin. For more information, see Live Library: 
+https://livelibrary.osisoft.com/LiveLibrary/content/en/web-api-v9/GUID-D0AF8333-3E78-4F4F-A233-4794DD71819C
 
 //ENDSECTION - VALIDATIONS//
 
@@ -415,4 +482,21 @@ https://github.com/osisoft/PI-System-Audit-Tools/
 If you encounter a bug, please submit it as an issue on the GitHub repo
 or fix the bug and submit a pull request!
         https://github.com/osisoft/PI-System-Audit-Tools/issues
+
+LICENSE
+
+Copyright 2016 OSIsoft, LLC
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+  <http://www.apache.org/licenses/LICENSE-2.0>
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+
 

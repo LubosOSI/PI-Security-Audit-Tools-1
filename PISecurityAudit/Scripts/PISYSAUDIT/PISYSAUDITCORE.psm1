@@ -1,9 +1,4 @@
-# ***********************************************************************
-# Core library
-# ***********************************************************************
-# * Modulename:   PISYSAUDIT
-# * Filename:     PISYSAUDITCORE.psm1
-# * Description:  Script block to create the PISYSAUDIT module.
+# ************************************************************************
 # *
 # * Copyright 2016 OSIsoft, LLC
 # * Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,15 +13,6 @@
 # * See the License for the specific language governing permissions and
 # * limitations under the License.
 # *
-# * Modifications copyright (C) <YYYY> <Name>, <Org>
-# * <Description of modification>
-# *
-# ************************************************************************
-# Version History:
-# ------------------------------------------------------------------------
-# Version 1.0.0.8 Initial release on OSIsoft Users Community.
-# Authors:  Jim Davidson, Bryan Owen and Mathieu Hamel from OSIsoft.
-#
 # ************************************************************************
 
 # ........................................................................
@@ -651,6 +637,15 @@ param(
 		[parameter(Mandatory=$false, ParameterSetName = "Default")]		
 		[string]
 		$InstanceName = "",
+	    [parameter(Mandatory=$false, ParameterSetName = "Default")]		
+		[boolean]
+		$IntegratedSecurity = $true,
+	    [parameter(Mandatory=$false, ParameterSetName = "Default")]		
+		[string]
+		$UserName = "",
+	    [parameter(Mandatory=$false, ParameterSetName = "Default")]		
+		[string]
+		$PasswordFile = "",
 		[parameter(Mandatory=$false, ParameterSetName = "Default")]
 		[alias("dbgl")]
 		[int]
@@ -660,19 +655,13 @@ param(
 	
 	try
 	{
-		$className = "Win32_Service"
-		$namespace = "root\CIMV2"
-		if(($InstanceName -eq "") -or ($InstanceName.ToLower() -eq "default") -or ($InstanceName.ToLower() -eq "mssqlserver"))
-		{ $filterExpression = [string]::Format("name='{0}'", "MSSQLSERVER") }
-		else
-		{
-			# Don't forget the escape character so that the '$' is not interpreted as a variable
-			$value = ("MSSQL`$" + $InstanceName).ToUpper()
-			$filterExpression = [string]::Format("name='{0}'", $value)			
-		}
-		$WMIObject = ExecuteWMIQuery $className -n $namespace -lc $LocalComputer -rcn $RemoteComputerName -FilterExpression $filterExpression -DBGLevel $DBGLevel								
-		if($null -eq $WMIObject) { return $false}
-		return $true
+		$result = $false
+		# Simplest query to return a response to ensure we can query the SQL server
+		$result = (Invoke-PISysAudit_Sqlcmd_ScalarValue -Query 'SELECT 1 as TEST' -LocalComputer $ComputerParams.IsLocal -RemoteComputerName $ComputerParams.ComputerName `
+											-InstanceName $ComputerParams.InstanceName -IntegratedSecurity $ComputerParams.IntegratedSecurity `
+											-UserName $ComputerParams.SQLServerUserID -PasswordFile $ComputerParams.PasswordFile `
+											-ScalarValue 'TEST' -DBGLevel $DBGLevel) -eq 1
+		return $result
 	}
 	catch
 	{ return $false }
@@ -1483,17 +1472,6 @@ param(
 		# Validate the presence of a SQL Server
 			try
 			{
-				if((ValidateIfHasSQLServerRole -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName `
-											-InstanceName $ComputerParams.InstanceName -dbgl $DBGLevel) -eq $false)						
-				{
-					# Return the error message.
-					$msgTemplate = "The computer {0} does not have a SQL Server role or the validation failed"
-					$msg = [string]::Format($msgTemplate, $ComputerParams.ComputerName)
-					Write-PISysAudit_LogMessage $msg "Warning" $fn
-					$AuditTable = New-PISysAuditError -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName `
-							-at $AuditTable -an "SQL Server Audit" -fn $fn -msg $msg
-					return
-				}
 				
 				if (-not (Get-Module -ListAvailable -Name SQLPS))
 				{
@@ -1509,11 +1487,20 @@ param(
 				Push-Location
 				Import-Module SQLPS -DisableNameChecking
 				Pop-Location
-				# Simplest query to return a response to ensure we can query the SQL server
-				Invoke-PISysAudit_Sqlcmd_ScalarValue -Query 'SELECT 1 as TEST' -LocalComputer $ComputerParams.IsLocal -RemoteComputerName $ComputerParams.ComputerName `
+
+				if((ValidateIfHasSQLServerRole -LocalComputer $ComputerParams.IsLocal -RemoteComputerName $ComputerParams.ComputerName `
 											-InstanceName $ComputerParams.InstanceName -IntegratedSecurity $ComputerParams.IntegratedSecurity `
 											-UserName $ComputerParams.SQLServerUserID -PasswordFile $ComputerParams.PasswordFile `
-											-ScalarValue 'TEST' | Out-Null
+											-dbgl $DBGLevel) -eq $false)						
+				{
+					# Return the error message.
+					$msgTemplate = "The computer {0} does not have a SQL Server role or the validation failed"
+					$msg = [string]::Format($msgTemplate, $ComputerParams.ComputerName)
+					Write-PISysAudit_LogMessage $msg "Warning" $fn
+					$AuditTable = New-PISysAuditError -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName `
+							-at $AuditTable -an "SQL Server Audit" -fn $fn -msg $msg
+					return
+				} 
 			}
 			catch
 			{
@@ -1667,7 +1654,7 @@ param(
 		try
 		{
 			Write-Progress -Activity $activityMsg1 -Status "Gathering PI Vision Configuration" -ParentId 1
-			Get-PISysAudit_GlobalPIVisionConfiguration -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName -DBGLevel $DBGLevel 
+			Get-PISysAudit_GlobalPIVisionConfiguration -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName -al $ComputerParams.Alias -DBGLevel $DBGLevel 
 		}
 		catch
 		{
@@ -1748,6 +1735,18 @@ param(
 			Write-PISysAudit_LogMessage $msg "Warning" $fn
 			$AuditTable = New-PISysAuditError -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName `
 							-at $AuditTable -an "PI Web API Server Audit" -fn $fn -msg $msg
+			return
+		}
+
+		# Check for availability of PowerShell Tools for the PI System
+		Test-PowerShellToolsForPISystemAvailable
+
+		if(-not $global:ArePowerShellToolsAvailable)
+		{
+			$msg = "Unable to locate module OSIsoft.Powershell on the computer running this script. Terminating PI Web API audit"
+			Write-PISysAudit_LogMessage $msg "Error" $fn
+			$AuditTable = New-PISysAuditError -lc $ComputerParams.IsLocal -rcn $ComputerParams.ComputerName `
+							-at $AuditTable -an "PI Web API Audit" -fn $fn -msg $msg
 			return
 		}
 
@@ -2002,9 +2001,12 @@ PROCESS
 		$msgTemplate5 = "Information, {0}."
 		$msgTemplate6 = "Function: {0}, Debug: {1}."
 		
+		if($Message.EndsWith("."))
+		{ $Message = $Message.Trim(".") }
+
 		# Message.
 		$msg = ""
-				
+		
 		if($MessageType.ToLower() -eq "error")
 		{
 			# This type of message is always shown whatever the debug level.
@@ -3345,7 +3347,7 @@ Get the servers in the PI Data Archive or PI AF Server KST.
 	return $KnownServers
 }
 
-function Get-PISysAudit_CheckPrivilege
+function Get-PISysAudit_ServicePrivilege
 {
 <#
 .SYNOPSIS
@@ -3356,9 +3358,9 @@ Return the access token (security) of a process or service.
 [CmdletBinding(DefaultParameterSetName="Default", SupportsShouldProcess=$false)]     
 param(
 		[parameter(Mandatory=$true, ParameterSetName = "Default")]
-		[alias("an")]
+		[alias("sn")]
 		[string]
-		$AccountName,	
+		$ServiceName,	
 		[parameter(Mandatory=$false, ParameterSetName = "Default")]
 		[alias("lc")]
 		[boolean]		
@@ -3377,63 +3379,47 @@ PROCESS
 	$fn = GetFunctionName
 	
 	try
-	{			
-		$AccountSID = Get-PISysAudit_AccountProperty -AccountName $AccountName -AccountProperty SID -lc $LocalComputer -rc $RemoteComputerName -DBGLevel $DBGLevel
-		if($null -eq $AccountSID)
+	{						
+		$FilterExpression = "name='$ServiceName'"
+		$ServiceInfo = ExecuteWMIQuery -WMIClassName Win32_Service -FilterExpression $FilterExpression -LocalComputer $LocalComputer -RemoteComputerName $RemoteComputerName -DBGLevel $DBGLevel																													
+		if ($null -ne ($ServiceInfo | Get-Member -Name ProcessId))
+		{
+			$ProcessId = $ServiceInfo.ProcessId
+		}
+		else
 		{
 			# Return the error message.
-			$msg = "Could not resolve the SID for $AccountName to evaluate the Privilege."
-			Write-PISysAudit_LogMessage $msg "Error" $fn
-			return $null
-		}
-		$scriptBlock = {
-					param([string]$SID) 
-					if(Test-Path $($env:ProgramData + "\OSIsoft")) 
-					{ 
-						$FilePathRoot = $($env:ProgramData + "\OSIsoft")
-					}
-					elseif(Test-Path $($env:pihome64 + "\dat"))
-					{
-						$FilePathRoot = $($env:pihome64 + "\dat")
-					}
-					else
-					{
-						return $null
-					}
-					$FilePath = $FilePathRoot + '\PISysAudit_CheckPrivilege.CFG'
-					$UtilityExecutable = $env:Windir + '\system32\secedit.exe'
-					$ArgumentList = @('/export', '/areas USER_RIGHTS', $('/cfg "' + $FilePath + '"'))
-					Start-Process -FilePath $UtilityExecutable -ArgumentList $ArgumentList -Wait -NoNewWindow
-					$FileContent = Get-Content -Path $FilePath
-					if(Test-Path $FilePath) { Remove-Item $FilePath }
-					$Privs = @()
-					Foreach($Priv in $FileContent)
-					{
-						if($Priv -like "Se*=*" -and $Priv -like $('*' + $SID + '*'))
-						{
-							$Privs += $Priv.Split('=').Trim()[0]
-						}
-					}
-					return $Privs
+			$msg = "Process ID could not be identified for: $ServiceName"
+			Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_
+			return $null 
 		}
 
+		# Set the path to the inner script.
+		$scriptsPath = (Get-Variable "scriptsPath" -Scope "Global").Value														
+		$checkProcessPrivilegePSScript = PathConcat -ParentPath $scriptsPath -ChildPath "\Utilities\CheckProcessPrivilege.ps1"
+
+		$msg = "Command to execute is: CheckProcessPrivilege.ps1 $ProcessId"			
+		Write-PISysAudit_LogMessage $msg "debug" $fn -dbgl $DBGLevel -rdbgl 2
+
 		if($LocalComputer)
-		{ $AccountPrivileges = & $scriptBlock -UserSID $AccountSID }
+		{ 
+			$result = & $checkProcessPrivilegePSScript $ProcessId 
+		}
 		else
 		{ 
-			$AccountPrivileges = Invoke-Command -ComputerName $RemoteComputerName -ScriptBlock $scriptBlock -ArgumentList $AccountSID
+			$result = Invoke-Command -ComputerName $RemoteComputerName -FilePath $checkProcessPrivilegePSScript -ArgumentList @( $ProcessId )
 		}
-		return $AccountPrivileges
+
+		$msg = "Privileges detected: $result"			
+		Write-PISysAudit_LogMessage $msg "debug" $fn -dbgl $DBGLevel -rdbgl 2
 	}
 	catch
 	{
-		# Return the error message.
 		$msg = "Reading privileges from the process failed"
 		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_
 		return $null
 	}
 	
-	# Return the result.
 	return $result
 }
 
@@ -3762,66 +3748,52 @@ PROCESS
 		# Build FQDN using hostname and domain strings.
 		$fqdn = $hostname + "." + $MachineDomain
 
+		$hostnameSPN = $($serviceType.ToLower() + "/" + $hostname.ToLower())
+		$fqdnSPN = $($serviceType.ToLower() + "/" + $fqdn.ToLower())
+
 		# SPN check is done for PI Vision using a custom host header.
 		If ( $ServiceName -eq "pivision_custom" ) 
 		{ 
 			# Pass the AppPool identity as the service account.
 			$svcacc = $AppPool
 			$svcaccParsed = Get-PISysAudit_ParseDomainAndUserFromString -UserString $svcacc -DBGLevel $DBGLevel
-				
-			# Take Custom header information and create its short and long version.
-			If ($CustomHeader -match "\.") 
-			{
-				$CustomHeaderLong = $CustomHeader
-				$pos = $CustomHeader.IndexOf(".")
-				$CustomHeaderShort = $CustomHeader.Substring(0, $pos)
-			} 
-			Else 
-			{ 
-				$CustomHeaderShort = $CustomHeader
-				$CustomHeaderLong = $CustomHeader + "." + $MachineDomain
-			}
 
-			# Deal with the custom header - run nslookup and capture the result.
+			<# 
+				Check if the custom header is a Alias (CNAME) or Host (A) entry.
+				
+				In case of Alias (CNAME), SPNs should exist for both the Alias (CNAME)
+				and the machine the Alias (CNAME) is pointing to. Overall, there should be 3 SPNs.
+
+				With Host (A) alias, the SPN is needed for the alias. We don't want to fail the check
+				for a missing SPN if they only intend for clients to access by the alias.
+			#>
 			$AliasTypeCheck = Get-PISysAudit_ResolveDnsName -LookupName $CustomHeader -Attribute Type -DBGLevel $DBGLevel
 
-			# Check if the custom header is a Alias (CNAME) or Host (A) entry.
 			If ($AliasTypeCheck -eq 'CNAME') 
 			{ 
-				# Verify hostnane AND FQDN SPNs are assigned to the service account.
-				#
-				# In case of Alias (CNAME), SPNs should exist for both short and fully qualified name of oth the Alias (CNAME)
-				# ..and for the machine the Alias (CNAME) is pointing to. Overall, there should be 4 SPNs.
-				#
-				# With Host (A) entries, SPNs are needed only for the short and fully qualified names.
-			
-				$hostnameSPN = $($serviceType.ToLower() + "/" + $hostname.ToLower())
-				$fqdnSPN = $($serviceType.ToLower() + "/" + $fqdn.ToLower())
-				$CustomHeaderSPN = $($serviceType.ToLower() + "/" + $CustomHeaderShort.ToLower())
-				$CustomHeaderLongSPN = $($serviceType.ToLower() + "/" + $CustomHeaderLong.ToLower())
+				$CustomHeaderSPN = $($serviceType.ToLower() + "/" + $CustomHeader.ToLower())
 			
 				$result = Test-PISysAudit_ServicePrincipalName -HostName $hostname -MachineDomain $MachineDomain `
 																-SPNShort $hostnameSPN -SPNLong $fqdnSPN `
-																-SPNShortAlias $CustomHeaderSPN -SPNLongAlias $CustomHeaderLongSPN `
-																-TargetAccountName $svcaccParsed.UserName -ServiceAccountDomain $svcaccParsed.Domain -DBGLevel $DBGLevel
+																-SPNAlias $CustomHeaderSPN -SPNAliasType $AliasTypeCheck `
+																-TargetAccountName $svcaccParsed.UserName -TargetDomain $svcaccParsed.Domain -DBGLevel $DBGLevel
 						
 				return $result			
 			} 			
 			ElseIf($AliasTypeCheck -eq 'A')
 			{ 
-				$CustomHeaderSPN = $($serviceType.ToLower() + "/" + $CustomHeaderShort.ToLower())
-				$CustomHeaderLongSPN = $($serviceType.ToLower() + "/" + $CustomHeaderLong.ToLower())
+				$CustomHeaderSPN = $($serviceType.ToLower() + "/" + $CustomHeader.ToLower())
 
 				$result = Test-PISysAudit_ServicePrincipalName -HostName $hostname -MachineDomain $MachineDomain `
-																-SPNShort $CustomHeaderSPN -SPNLong $CustomHeaderLongSPN `
+																-SPNShort $hostnameSPN -SPNLong $fqdnSPN `
+																-SPNAlias $CustomHeaderSPN -SPNAliasType $AliasTypeCheck `
 																-TargetAccountName $svcaccParsed.UserName -TargetDomain $svcaccParsed.Domain -DBGLevel $DBGLevel
 
 				return $result
 			}
 			Else
 			{
-				$msgTemplate = "Unexpected DNS record type: {0}"	
-				$msg = [string]::Format($msgTemplate, $AliasTypeCheck)
+				$msg = "Unexpected DNS record type: $AliasTypeCheck"
 				Write-PISysAudit_LogMessage $msg "Error" $fn
 				return $null
 			}
@@ -3842,11 +3814,8 @@ PROCESS
 				$svcacc = Get-PISysAudit_ServiceProperty -sn $ServiceName -sp LogOnAccount -lc $LocalComputer -rcn $RemoteComputerName -dbgl $DBGLevel
 			}
 			$svcaccParsed = Get-PISysAudit_ParseDomainAndUserFromString -UserString $svcacc -DBGLevel $DBGLevel
-			# Proceed with checking SPN for PI Vision or non-IIS app (PI/AF).
-			# Distinguish between Domain/Virtual account and Machine Accounts.
-			$hostnameSPN = $($serviceType.ToLower() + "/" + $hostname.ToLower())
-			$fqdnSPN = $($serviceType.ToLower() + "/" + $fqdn.ToLower())
 
+			# Distinguish between Domain/Virtual account and Machine Accounts.
 			$result = Test-PISysAudit_ServicePrincipalName -HostName $hostname -MachineDomain $MachineDomain `
 															-SPNShort $hostnameSPN -SPNLong $fqdnSPN `
 															-TargetAccountName $svcaccParsed.UserName -TargetDomain $svcaccParsed.Domain -DBGLevel $DBGLevel
@@ -3856,7 +3825,6 @@ PROCESS
 	}
 	catch
 	{
-		# Return the error message.
 		$msg = "A problem occurred using setspn.exe"	
 		Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_
 		return $null
@@ -4064,14 +4032,15 @@ param(
 		[alias("SPNL")]
 		[string]
 		$SPNLong,
-		[parameter(Mandatory=$false, ParameterSetName = "Default")]		
-		[alias("SPNSA")]
-		[string]
-		$SPNShortAlias="",
 		[parameter(Mandatory=$false, ParameterSetName = "Default")]
-		[alias("SPNLA")]
+		[alias("SPNA")]
 		[string]
-		$SPNLongAlias="",
+		$SPNAlias="",
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]
+		[alias("SPNAT")]
+		[ValidateSet('CNAME','A','None')]
+		[string]
+		$SPNAliasType="None",
 		[parameter(Mandatory=$true, ParameterSetName = "Default")]		
 		[alias("TargetAccountName")]
 		[string]
@@ -4088,10 +4057,19 @@ BEGIN {}
 PROCESS		
 {		
 	$fn = GetFunctionName
-	$blnAlias = $false
+
 	try
-	{
-		$blnAlias = $SPNShortAlias -ne "" -and $SPNLongAlias -ne ""
+	{	
+		# Set the list of SPNs to check.
+		switch ($SPNAliasType)
+		{
+			'CNAME' { $spnList = @($SPNShort, $SPNLong, $SPNAlias); break }
+			'A' { $spnList = @($SPNAlias); break }
+			'None' { $spnList = @($SPNShort, $SPNLong); break }
+		}
+
+		$msg = "Searching for SPNs: " + $($spnList -join ",")
+		Write-PISysAudit_LogMessage $msg "debug" $fn -dbgl $DBGLevel -rdbgl 2
 		
 		# Define user syntax for SPN command
 		If($strSPNtargetDomain -eq 'MACHINEACCOUNT') # Use the hostname when a machine account is identified
@@ -4107,6 +4085,9 @@ PROCESS
 		
 		# Run setspn. Redirect stderr to null to prevent errors from bubbling up
 		$spnCheck = $(setspn -l $accountNane 2>$null) 
+		
+		$msg = "SPN query returned: $spnCheck"					
+		Write-PISysAudit_LogMessage $msg "debug" $fn -dbgl $DBGLevel -rdbgl 2
 
 		# Null if something went wrong
 		if($null -eq $spnCheck)
@@ -4119,35 +4100,23 @@ PROCESS
 		# Loop through SPNs, trimming and ensure all lower for comparison
 		$spnCounter = 0
 		foreach($line in $spnCheck)
-		{		
-			If($blnAlias){
-				switch($line.ToLower().Trim())
-				{
-					$SPNShort {$spnCounter++; break}
-					$SPNLong {$spnCounter++; break}
-					$SPNShortAlias {$spnCounter++; break}
-					$SPNLongAlias {$spnCounter++; break}
-					default {break}
-				}
-			}
-			Else
+		{
+			if($line.ToLower().Trim() -in $spnList)
 			{
-				switch($line.ToLower().Trim())
-				{
-					$SPNShort {$spnCounter++; break}
-					$SPNLong {$spnCounter++; break}
-					default {break}
-				}
-			}	
+				$spnCounter++
+			}
 		}
 
 		# Return details to improve messaging in case of failure.
-		If ($blnAlias -and $spnCounter -eq 4) { $result = $true } 
-		ElseIf ($spnCounter -eq 2) { $result = $true }
-		Else 
-		{ 
-			$result =  $false 
+		If ($spnCounter -eq $spnList.Count)
+		{
+			$result = $true
 		}
+		Else
+		{
+			$result = $false
+		}
+		
 		return $result
 	}
 	catch
@@ -4331,6 +4300,9 @@ PROCESS
 		# Define the complete SQL Server name (Server + instance name)
 		$SQLServerName = ReturnSQLServerName $computerName $InstanceName											
 		
+		$msg = "Invoking query: $Query" 					
+	    Write-PISysAudit_LogMessage $msg "debug" $fn -dbgl $DBGLevel -rdbgl 2
+
 		# Integrated Security or SQL Security?
 		if($IntegratedSecurity -eq $false)
 		{
@@ -4362,12 +4334,15 @@ PROCESS
 				$pwd = GetPasswordOnDisk $PasswordFile				
 			}
 
-			$value = Invoke-Sqlcmd -Query $query -ServerInstance $SQLServerName -Username $UserName -Password $pwd | Select-Object -ExpandProperty $ScalarValue
+			$value = Invoke-Sqlcmd -Query $Query -ServerInstance $SQLServerName -Username $UserName -Password $pwd | Select-Object -ExpandProperty $ScalarValue
 		}
 		else
 		{
-			$value = Invoke-Sqlcmd -Query $query -ServerInstance $SQLServerName | Select-Object -ExpandProperty $ScalarValue
+			$value = Invoke-Sqlcmd -Query $Query -ServerInstance $SQLServerName | Select-Object -ExpandProperty $ScalarValue
 		}
+
+		$msg = "Query returned: $value" 					
+	    Write-PISysAudit_LogMessage $msg "debug" $fn -dbgl $DBGLevel -rdbgl 2
 	}
 	catch
 	{
@@ -4434,6 +4409,13 @@ PROCESS
 																-IntegratedSecurity $ComputerParameter.IntegratedSecurity `
 																-SQLServerUserID $ComputerParameter.SQLServerUserID `
 																-PasswordFile $ComputerParameter.PasswordFile
+		}
+		ElseIf($null -ne ($ComputerParameter | Get-Member -Name Alias))
+		{
+			$ComputerParamsTable = New-PISysAuditComputerParams -ComputerParamsTable $ComputerParamsTable `
+																-ComputerName $ComputerParameter.ComputerName `
+																-PISystemComponent $ComputerParameter.PISystemComponentType `
+																-Alias $ComputerParameter.Alias
 		}
 		Else
 		{
@@ -4664,34 +4646,44 @@ New-PISysAuditComputerParams [[-ComputerParamsTable | -cpt] <hashtable>]
 .INPUTS
 .OUTPUTS
 <hashtable> containing the PISysAuditComputerParams objects.
-.PARAMETER cpt
+.PARAMETER ComputerParamsTable
 Parameter table defining which computers/servers
 to audit and for which PI System components. If a $null
 value is passed or the parameter is skipped, the cmdlet
 will assume to audit the local machine.
-.PARAMETER type
-PI System Component to audit.
-PI, PIDataArchive, PIServer refer to a PI Data Archive component.
-PIAF, PIAFServer, AF refer to a PI AF Server component.
-SQL, SQLServer refer to a SQL Server component.
-PIVision, Vision refer to a PI Vision server component.
-PIWebAPI, WebAPI refer to a PI Web API component.
+.PARAMETER ComputerName
+Name of the target computer with the PI System component.
+.PARAMETER PISystemComponentType
+PI System Component to audit.  All supported commponents
+with their supported aliases are listed below.
+Component       - Supported Values
+PI Data Archive - "PIServer", "PIDataArchive", "PIDA"
+PI AF Server    - "PIAFServer", "AFServer", "PIAF", "AF"
+MS SQL Server   - "SQLServer", "SQL", "PICoresightServer" 
+PI Vision       - "PIVision", "PV", "Vision", "PIVisionServer",
+                  "CoresightServer", "PICoresight", "Coresight",  
+                  "PICS", "CS","VisionServer"
+PI Web API      - "PIWebAPIServer", "PIWebAPI", "WebAPI"
+                  "WebAPIServer"
 .PARAMETER InstanceName
 Parameter to specify the instance name of your SQL Server. If a blank string
 or "default" or "mssqlserver" is passed, this will refer to the default
 instance.
 .PARAMETER IntegratedSecurity
 Use or not the Windows integrated security. Default is true.
-.PARAMETER user
+.PARAMETER SQLServerUserID
 Specify a SQL user account to use if you are not using the
 Windows integrated security.
-.PARAMETER pf
+.PARAMETER PasswordFile
 Specifiy a file that will contained a ciphered password obtained with the
 New-PISysAudit_PasswordOnDisk cmdlet. If not specify and the -user parameter
 is configured, the end-user will be prompted to enter the password once. This
 password will be kept securely in memory until the end of the execution.
-.PARAMETER showui
+.PARAMETER ShowUI
 Output messages on the command prompt or not.
+.PARAMETER Alias
+Name other than the machine name used by clients to access the server.
+Presently only used by PI Vision checks.
 .EXAMPLE
 $cpt = New-PISysAuditComputerParams -cpt $cpt -cn "MyPIServer" -type "pi"
 The -cpt will use the hashtable of parameters to know how to audit
@@ -4737,6 +4729,10 @@ param(
 		[alias("pf")]
 		[string]
 		$PasswordFile = "",
+		[parameter(Mandatory=$false, ParameterSetName = "Default")]		
+		[alias("al")]
+		[string]
+		$Alias = "",
 		[parameter(Mandatory=$false, ParameterSetName = "Default")]				
 		[boolean]
 		$ShowUI = $true)
@@ -4796,52 +4792,31 @@ PROCESS
 	# ............................................................................................................	
 	# Create a custom object (PISysAuditComputerParams).
 	$tempObj = New-Object PSCustomObject
-	
-	if(($PISystemComponentType.ToLower() -eq "piserver") -or `
-		($PISystemComponentType.ToLower() -eq "pidataarchive") -or `
-		($PISystemComponentType.ToLower() -eq "pida") -or `
-		($PISystemComponentType.ToLower() -eq "dataarchive"))
+	Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "ComputerName" -Value $resolvedComputerName
+	Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "IsLocal" -Value $localComputer
+	Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "AuditRoleType" -Value $null	
+	Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "Alias" -Value $null
+	Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "InstanceName" -Value $null
+	Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "IntegratedSecurity" -Value $null	
+	Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "SQLServerUserID" -Value $null
+	Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "PasswordFile" -Value $null	
+
+	if($PISystemComponentType.ToLower() -in @("piserver","pidataarchive","pida","dataarchive"))
 	{
-		# Set the properties.
-		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "ComputerName" -Value $resolvedComputerName
-		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "IsLocal" -Value $localComputer		
-		# Use normalized type description as 'PIDataArchive'
-		$AuditRoleType = "PIDataArchive"
-		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "AuditRoleType" -Value $AuditRoleType
-		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "InstanceName" -Value $null
-		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "IntegratedSecurity" -Value $null	
-		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "SQLServerUserID" -Value $null
-		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "PasswordFile" -Value $null		
+		$tempObj.AuditRoleType = "PIDataArchive"
 	}
-	elseif(($PISystemComponentType.ToLower() -eq "piafserver") -or `
-		($PISystemComponentType.ToLower() -eq "afserver") -or `
-		($PISystemComponentType.ToLower() -eq "piaf") -or `
-		($PISystemComponentType.ToLower() -eq "af"))
-	{
-		# Set the properties.
-		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "ComputerName" -Value $resolvedComputerName
-		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "IsLocal" -Value $localComputer		
-		# Use normalized type description as 'PIAFServer'
-		$AuditRoleType = "PIAFServer"
-		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "AuditRoleType" -Value $AuditRoleType
-		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "InstanceName" -Value $null
-		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "IntegratedSecurity" -Value $null	
-		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "SQLServerUserID" -Value $null
-		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "PasswordFile" -Value $null		
+	elseif($PISystemComponentType.ToLower() -in @("piafserver","afserver","piaf","af"))
+	{	
+		$tempObj.AuditRoleType = "PIAFServer"
 	}
-	elseif(($PISystemComponentType.ToLower() -eq "sqlserver") -or `
-		($PISystemComponentType.ToLower() -eq "sql"))
-	{		
-		# Set the properties.
-		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "ComputerName" -Value $resolvedComputerName
-		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "IsLocal" -Value $localComputer		
-		# Use normalized type description as 'SQLServer'
-		$AuditRoleType = "SQLServer"
-		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "AuditRoleType" -Value $AuditRoleType
-		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "InstanceName" -Value $InstanceName
-		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "IntegratedSecurity" -Value $IntegratedSecurity	
-		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "SQLServerUserID" -Value $SQLServerUserID
-		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "PasswordFile" -Value $PasswordFile				
+	elseif($PISystemComponentType.ToLower() -in @("sqlserver","sql"))
+	{			
+		$tempObj.AuditRoleType = "SQLServer"
+		$tempObj.InstanceName = $InstanceName
+		$tempObj.IntegratedSecurity = $IntegratedSecurity	
+		$tempObj.InstanceName = $InstanceName
+		$tempObj.SQLServerUserID = $SQLServerUserID
+		$tempObj.PasswordFile = $PasswordFile		
 		
 		# Test if a user name has been passed if Window integrated security is not used
 		if($IntegratedSecurity -eq $false)
@@ -4881,48 +4856,14 @@ PROCESS
 			}
 		}	
 	}
-	elseif (($PISystemComponentType.ToLower() -eq "picoresightserver") -or `
-		($PISystemComponentType.ToLower() -eq "picoresight") -or `
-		($PISystemComponentType.ToLower() -eq "coresightserver") -or `
-		($PISystemComponentType.ToLower() -eq "coresight") -or `
-		($PISystemComponentType.ToLower() -eq "cs") -or `
-		($PISystemComponentType.ToLower() -eq "pics") -or `
-		($PISystemComponentType.ToLower() -eq "pivision") -or `
-		($PISystemComponentType.ToLower() -eq "visionserver") -or `
-		($PISystemComponentType.ToLower() -eq "vision") -or `
-		($PISystemComponentType.ToLower() -eq "pivisionserver") -or `
-		($PISystemComponentType.ToLower() -eq "pv")
-	)
-	{
-		# Set the properties.
-		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "ComputerName" -Value $resolvedComputerName
-		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "IsLocal" -Value $localComputer		
-		# Use normalized type description as 'PIVisionServer'
-		$AuditRoleType = "PIVisionServer"
-		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "AuditRoleType" -Value $AuditRoleType
-		# Nullify all of the MS SQL specific values
-		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "InstanceName" -Value $null
-		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "IntegratedSecurity" -Value $null	
-		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "SQLServerUserID" -Value $null
-		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "PasswordFile" -Value $null		
+	elseif ($PISystemComponentType.ToLower() -in @("picoresightserver","picoresight","coresightserver","coresight","cs","pics","pivision","visionserver","vision","pivisionserver","pv"))
+	{		
+		$tempObj.AuditRoleType = "PIVisionServer"	
+		$tempObj.Alias = $Alias
 	}
-	elseif (($PISystemComponentType.ToLower() -eq "piwebapiserver") -or `
-		($PISystemComponentType.ToLower() -eq "piwebapi") -or `
-		($PISystemComponentType.ToLower() -eq "webapiserver") -or `
-		($PISystemComponentType.ToLower() -eq "webapi")
-	)
+	elseif ($PISystemComponentType.ToLower() -in @("piwebapiserver","piwebapi","webapiserver","webapi"))
 	{
-		# Set the properties.
-		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "ComputerName" -Value $resolvedComputerName
-		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "IsLocal" -Value $localComputer		
-		# Use normalized type description as 'PIWebApiServer'
-		$AuditRoleType = "PIWebApiServer"
-		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "AuditRoleType" -Value $AuditRoleType
-		# Nullify all of the MS SQL specific values
-		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "InstanceName" -Value $null
-		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "IntegratedSecurity" -Value $null	
-		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "SQLServerUserID" -Value $null
-		Add-Member -InputObject $tempObj -MemberType NoteProperty -Name "PasswordFile" -Value $null
+		$tempObj.AuditRoleType = "PIWebApiServer"
 	}
 
 	# Add hashtable item and computer audit if not already in params table
@@ -5059,7 +5000,7 @@ PROCESS
 				{
 					$suppressedCheckIDs += $suppressedCheckID + "; "
 				}
-				$suppressedCheckIDs = $suppressedCheckIDs.Trim(';')
+				$suppressedCheckIDs = $suppressedCheckIDs.Trim('; ')
 			}
 
 			# Construct HTML table for errors
@@ -5151,7 +5092,7 @@ PROCESS
 					if($PSVersionTable.PSVersion.Major -eq 2){$recommendationInfoDescription = $recommendationInfo.Description[0].Text} 
 					else {$recommendationInfoDescription = $recommendationInfo.Description.Text}
 					$recommendations +=@"
-					<b id="$($_.ID)">$($recommendationInfo.Synopsis)</b>
+					<b id="$($_.ID)">$($_.ID + " - " + $_.AuditItemName)</b>
 					<br/>
 					<p>$recommendationInfoDescription</p>
 					<br/>
@@ -5259,7 +5200,7 @@ PROCESS
 			
 					<br/>
 
-					$Recommendations
+					$recommendations
 					
 				</body>
 			</html>
@@ -5312,7 +5253,8 @@ specifies a CSV file.
 Alias: -cpf
 CSV file defining which computers/servers to audit and 
 for which PI System components. Headings must be included 
-in the CSV file.  See example 7 in the conceptual help.
+in the CSV file.  See "Running a batch of audits" in the 
+readme.txt in the module folder.
 .PARAMETER ObfuscateSensitiveData
 Alias: -obf
 Obfuscate or not the name of computers/servers
@@ -5679,7 +5621,7 @@ Export-ModuleMember Get-PISysAudit_CertificateProperty
 Export-ModuleMember Get-PISysAudit_BoundCertificate
 Export-ModuleMember Get-PISysAudit_ResolveDnsName
 Export-ModuleMember Get-PISysAudit_GroupMembers
-Export-ModuleMember Get-PISysAudit_CheckPrivilege
+Export-ModuleMember Get-PISysAudit_ServicePrivilege
 Export-ModuleMember Get-PISysAudit_InstalledComponents
 Export-ModuleMember Get-PISysAudit_InstalledKBs
 Export-ModuleMember Get-PISysAudit_InstalledWin32Feature

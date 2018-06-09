@@ -13,9 +13,6 @@
 # * See the License for the specific language governing permissions and
 # * limitations under the License.
 # *
-# * Modifications copyright (C) <YYYY> <Name>, <Org>
-# * <Description of modification>
-# *
 # ************************************************************************
 
 If(Get-Module PISYSAudit){
