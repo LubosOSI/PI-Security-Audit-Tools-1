@@ -87,7 +87,7 @@ To view the conceptual help, run the command below:
 Enter the following instruction to add a PI Data Archive component to the audit (substitute in the name of your machine for PIOmniBox):  
     $cpt = piauditparams $null "piomnibox" "pidataarchive"  
 
-If you have other components to add, e.g. PIDataArchive, PIAFServer, SQLServer, PIVision, or PIWebAPI, you can add them to the same object.  The command below also adds a PI AF Server component.  
+If you have other components to add, e.g. PIDataArchive, PIAFServer, SQLServer, PIVision, PIWebAPI, or MachineOnly, you can add them to the same object.  The command below also adds a PI AF Server component.  
     $cpt = piauditparams $cpt "piomnibox" "piafserver"
 
 Finally, when you are done adding components, launch the audit with the piaudit command.  
@@ -129,11 +129,14 @@ piaudit
 
 # Example 2
 # Example with specific parameters for each server/PI Component.
+# Note the use of the MachineOnly check for machines without directly supported roles.
 $cpt = piauditparams $null "myPIServer" "PIDataArchive"
 $cpt = piauditparams $cpt "myPIAFServer" "PIAFServer"
 $cpt = piauditparams $cpt "mySQLServer" "SQLServer" -InstanceName "myinstance" # -IntegratedSecurity $false -user "sa" -pf "p1.dat"
 $cpt = piauditparams $cpt "myPIVision" "PIVisionServer"
 $cpt = piauditparams $cpt "myPIVision2" "PIVisionServer" -Alias "myPV.example.org"
+$cpt = piauditparams $cpt "myPIConnector1" "MachineOnly"
+$cpt = piauditparams $cpt "myPIIntegrator1" "MachineOnly"
 piaudit -cpt $cpt
 
 # Example 3

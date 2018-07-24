@@ -4391,17 +4391,43 @@ PROCESS
 	}
 	Else
 	{
-		$msg = "Computer parameters file not found."
+		$msg = "Computer parameters file not found at '$ComputerParametersFile'."
 		Write-PISysAudit_LogMessage $msg "Error" $fn -sc $true
 		return $null
 	}
+
+	if($null -eq $ComputerParameters)
+	{
+		$msg = "No computer parameters found in file '$ComputerParametersFile'."
+		Write-PISysAudit_LogMessage $msg "Error" $fn -sc $true
+		return $null
+	}
+
+	$requiredHeaders = @("ComputerName", "PISystemComponentType")
+	$headers = ($ComputerParameters | Get-Member -MemberType NoteProperty).Name
+	
+	# Compare-Object is case-insensitive and does not require sequential order by default
+	if( @(Compare-Object $headers $requiredHeaders -IncludeEqual -ExcludeDifferent).Length -ne 2 )
+	{
+		$msg = "Valid header line must be included in top line of parameter file. Columns must include 'ComputerName' and 'PISystemComponentType' at minimum."
+		Write-PISysAudit_LogMessage $msg "Error" $fn -sc $true
+		return $null
+	}
+
 	$sqlServerLabels = @('sql','sqlserver')
 	Foreach($ComputerParameter in $ComputerParameters)
 	{
-		If($ComputerParameter.PISystemComponentType.ToLower() -in $sqlServerLabels)
+		If($null -ne $ComputerParameter.PISystemComponentType `
+			-and $ComputerParameter.PISystemComponentType.ToLower() -in $sqlServerLabels)
 		{
-			If($ComputerParameter.IntegratedSecurity.ToLower() -eq 'false'){$ComputerParameter.IntegratedSecurity = $false}
-			Else {$ComputerParameter.IntegratedSecurity = $true}
+			If($null -ne $ComputerParameter.IntegratedSecurity -and $ComputerParameter.IntegratedSecurity.ToLower() -eq 'false')
+			{
+				$ComputerParameter.IntegratedSecurity = $false
+			}
+			Else 
+			{
+				$ComputerParameter.IntegratedSecurity = $true
+			}
 			$ComputerParamsTable = New-PISysAuditComputerParams -ComputerParamsTable $ComputerParamsTable `
 																-ComputerName $ComputerParameter.ComputerName `
 																-PISystemComponent $ComputerParameter.PISystemComponentType `
@@ -4663,8 +4689,10 @@ MS SQL Server   - "SQLServer", "SQL", "PICoresightServer"
 PI Vision       - "PIVision", "PV", "Vision", "PIVisionServer",
                   "CoresightServer", "PICoresight", "Coresight",  
                   "PICS", "CS","VisionServer"
-PI Web API      - "PIWebAPIServer", "PIWebAPI", "WebAPI"
+PI Web API      - "PIWebAPIServer", "PIWebAPI", "WebAPI",
                   "WebAPIServer"
+Machine Only    - "MachineOnly", "Machine", "ComputerOnly",
+                  "Computer"
 .PARAMETER InstanceName
 Parameter to specify the instance name of your SQL Server. If a blank string
 or "default" or "mssqlserver" is passed, this will refer to the default
@@ -4711,7 +4739,8 @@ param(
 					"CoresightServer", "PICoresight", 
 					"Coresight", "PICS", "CS", "PIVision",
 					"PIVisionServer","Vision","VisionServer","PV",
-					"PIWebAPIServer", "PIWebAPI", "WebAPI", "WebAPIServer")]
+					"PIWebAPIServer", "PIWebAPI", "WebAPI", "WebAPIServer",
+					"MachineOnly", "Machine", "ComputerOnly", "Computer")]
 		[alias("type")]
 		[string]		
 		$PISystemComponentType,
@@ -4864,6 +4893,12 @@ PROCESS
 	elseif ($PISystemComponentType.ToLower() -in @("piwebapiserver","piwebapi","webapiserver","webapi"))
 	{
 		$tempObj.AuditRoleType = "PIWebApiServer"
+	}
+	elseif ($PISystemComponentType.ToLower() -in @("machineonly", "machine", "computeronly", "computer"))
+	{
+		# Don't add another parameter if only Machine checks are required, just use the computer audit parameter.
+		$tempObj.AuditRoleType = "MachineOnly"
+		$skipParam = $true
 	}
 
 	# Add hashtable item and computer audit if not already in params table
@@ -5370,19 +5405,6 @@ PROCESS
 		default   { $AuditLevelInt = 1 }
 	}
 	
-	# Write the first message in the log file.
-	$msg = "----- Start the audit -----"
-	Write-PISysAudit_LogMessage $msg "Info" $fn		
-			
-	# Add 1 line of padding before showing audit failure list
-	if($ShowUI)
-	{ Write-Host "`r`n"	}
-
-	# Write headers for issues that are found
-	$msg = "{0,-9} {1,-8} {2,-20} {3,40}"
-	Write-Host ($msg -f 'Severity','ID','Server','Audit Item Name')
-	Write-Host ('-' * 80)
-	
 	# ............................................................................................................
 	# Initialize the table of results
 	# ............................................................................................................
@@ -5406,8 +5428,26 @@ PROCESS
 		Else
 		{
 			$ComputerParamsTable = Import-PISysAuditComputerParamsFromCsv -cpf $ComputerParametersFile
+			if($null -eq $ComputerParamsTable)
+			{
+				# Failed to load params from file
+				return
+			}
 		}	
 	}
+
+	# Write the first message in the log file.
+	$msg = "----- Start the audit -----"
+	Write-PISysAudit_LogMessage $msg "Info" $fn		
+			
+	# Add 1 line of padding before showing audit failure list
+	if($ShowUI)
+	{ Write-Host "`r`n"	}
+
+	# Write headers for issues that are found
+	$msg = "{0,-9} {1,-8} {2,-20} {3,40}"
+	Write-Host ($msg -f 'Severity','ID','Server','Audit Item Name')
+	Write-Host ('-' * 80)
 
 	# ............................................................................................................
 	# Get total count of audit role checks to be performed, prep messages for progress bar

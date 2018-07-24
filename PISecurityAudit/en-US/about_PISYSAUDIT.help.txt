@@ -203,9 +203,12 @@ https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v10/GUID-14FC1696-
 AU20013 - PI Backup Configured
 VALIDATION: Ensures that PI Backups are configured and current. 
 COMPLIANCE: Configure PI Backup to back up PI Data Archive configuration and 
-data daily. It is best practice to back up to a local disk on the PI Data
-Archive machine, then copy the backup to an off-machine location. For more 
-information, see:
+data daily. Ad hoc backups with PI SMT or with the pibackup.bat script with 
+type COPY will register as not compliant because they do not update the 
+LastBackupTime attribute, and will not be detected. Incremental backups as
+installed by pibackup.bat update the LastBackupTime. It is best practice to 
+back up to a local disk on the PI Data Archive machine, then copy the backup 
+to an off-machine location. For more information, see:
 https://livelibrary.osisoft.com/LiveLibrary/content/en/server-v10/GUID-8F56FDA9-505C-4868-8483-E51435E80A61
 
 AU20015 -  - PI Network Manager Service Account
@@ -452,11 +455,17 @@ AU60004 - PI Web API HTTP Headers
 VALIDATION: Verifies that best practices for HTTP headers are implemented
 in the PI Web API. 
 COMPLIANCE: Ensure that the X-Frame-Options header is set to enforce framing
-restrictions. Ensure that the Strict-Transport-Security header is set to enforce
-HTTP strict transport security (HSTS). For configuration steps, see Live Library: 
-https://livelibrary.osisoft.com/LiveLibrary/content/en/web-api-v9/GUID-5EB0EE2A-B2D0-44D5-935A-422E9FA574A8  
-For additional recommendations, see KB01631: 
-https://techsupport.osisoft.com/Troubleshooting/KB/KB01631/
+restrictions and the Strict-Transport-Security header is set to enforce HTTP 
+strict transport security (HSTS). Both of these protections can be configured
+as custom headers in the PI Web API. For configuration steps, see Custom 
+headers in the PI Web API Live Library documentation: 
+https://livelibrary.osisoft.com/LiveLibrary/content/en/web-api-v9/GUID-AF281636-B731-443E-879D-202C1062932B 
+Information on X-Frame-Options and supported values can be found here: 
+https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/X-Frame-Options 
+Information on HSTS and supported values can be found here: 
+https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Strict-Transport-Security 
+For additional web security recommendations, see KB01631: 
+https://techsupport.osisoft.com/Troubleshooting/KB/KB01631/ 
 
 AU60005 - PI Web API CORS
 VALIDATION: Verifies that CORS origins are restricted to a whitelist of domains, if CORS is enabled. 
@@ -497,6 +506,7 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
+
 
 
 
