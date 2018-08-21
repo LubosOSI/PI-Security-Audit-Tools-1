@@ -764,7 +764,7 @@ Live Library: <br/>
 
         try {
             if ($global:ArePowerShellToolsAvailable) {
-                $version = [int]($global:AFServerConnection.ServerVersion -replace [System.Management.Automation.Language.CodeGeneration]::EscapeSingleQuotedStringContent('\.'), [System.String]::Empty)
+                $version = [int](SafeReplace $global:AFServerConnection.ServerVersion '\.' '')
                 if ($version -ge 2700000) {
                     $afServer = $global:AFServerConnection.ConnectionInfo.PISystem
                     # Get identities with Admin Right on the AF Server object
@@ -944,8 +944,7 @@ see:
                 $match = $regex.Match($global:AFDiagOutput)
                 if ($match.Success) {
                     # Sanitize connection string by removing white space
-                    $replaceString = [System.Management.Automation.Language.CodeGeneration]::EscapeSingleQuotedStringContent('\s')
-                    $connectStr = $match.Value -replace $replaceString, [System.String]::Empty
+                    $connectStr = SafeReplace $match.Value '\s' ''
                     if ($connectStr.Contains('IntegratedSecurity=SSPI')) {
                         $result = $true
                         $msg = "AF Service connects to SQL using Windows Integrated Security."
@@ -1133,7 +1132,7 @@ see:
             if ($global:ArePowerShellToolsAvailable -and (Test-AFServerConnectionAvailable)) {
                 $con = $global:AFServerConnection
 
-                $version = [int]($con.ServerVersion -replace [System.Management.Automation.Language.CodeGeneration]::EscapeSingleQuotedStringContent('\.'), [System.String]::Empty)
+                $version = [int](SafeReplace $con.ServerVersion '\.' '')
                 if ($version -ge 2700000) {
                     # ............................................................................................................
                     # Compile list of identities with any write access to server or a database

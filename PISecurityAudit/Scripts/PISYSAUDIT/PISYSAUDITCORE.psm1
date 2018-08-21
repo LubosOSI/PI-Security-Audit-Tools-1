@@ -15,16 +15,15 @@
 # *
 # ************************************************************************
 
-# ........................................................................
-# Global Variables
-#
-#	PISysAuditShowUI
-#	ScriptsPath
-#	PasswordPath
-#	PISysAuditInitialized
-#	PISysAuditCachedSecurePWD
-#   PISysAuditIsElevated
-# ........................................................................
+<#
+Global Variables
+    PISysAuditShowUI
+    ScriptsPath
+    PasswordPath
+    PISysAuditInitialized
+    PISysAuditCachedSecurePWD
+    PISysAuditIsElevated
+#>
 [Diagnostics.CodeAnalysis.SuppressMessageAttribute("PSAvoidGlobalVars", "")]
 [Diagnostics.CodeAnalysis.SuppressMessageAttribute("PSAvoidUsingWriteHost", "", Justification="Where used, we do not need to recapture, redirect, or suppress output.")]
 param()
@@ -126,6 +125,13 @@ function NewObfuscateValue {
 }
 
 function NewAuditFunction {
+    <#
+.SYNOPSIS
+(Core functionality) Creates an audit function object.
+.DESCRIPTION
+Creates an audit function object which associates the name, unique ID and
+whether the function is included in a Basic or Verbose audit.
+#>
     Param($name, $level, $id)
     $obj = New-Object pscustomobject
     $obj | Add-Member -MemberType NoteProperty -Name 'Name' -Value $name
@@ -161,10 +167,12 @@ function CheckIfRunningElevated {
 
     try {
         if ($ExecutionContext.SessionState.LanguageMode -eq "ConstrainedLanguage") {
-            # sfc utility requires admin to run on all supported OSes
-            # when run elevated, it will return the list of arguments
-            # if not run elevated, it will return a message stating
-            # the user must be admin.
+            <#
+            sfc utility requires admin to run on all supported OSes
+            when run elevated, it will return the list of arguments
+            if not run elevated, it will return a message stating
+            the user must be admin.
+            #>
             return ($(sfc /? | Out-String) -like '*/*')
         }
         else {
@@ -173,41 +181,9 @@ function CheckIfRunningElevated {
         }
     }
     catch {
-        # Return the error message.
         $msg = "Error encountered when checking if running elevated."
         Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_
         return $false
-    }
-}
-
-function ValidateFileContent {
-    [OutputType([System.Boolean])]
-    [CmdletBinding(DefaultParameterSetName = "Default", SupportsShouldProcess = $false)]
-    param(
-        [parameter(Mandatory = $true, Position = 0, ParameterSetName = "Default")]
-        [alias("fc")]
-        $FileContent,
-        [parameter(Mandatory = $true, Position = 1, ParameterSetName = "Default")]
-        [alias("v")]
-        [string]
-        $Validation)
-
-    $fn = GetFunctionName
-
-    try {
-        Foreach ($line in $FileContent) {
-            if (($line.ToLower() ).Contains($Validation.ToLower() ))
-            { return $true }
-        }
-
-        # The content was not found.
-        return $false
-    }
-    catch {
-        # Return the error message.
-        $msg = "The content validation has failed"
-        Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_
-        return $null
     }
 }
 
@@ -324,96 +300,6 @@ function SetSQLAccountPasswordInCache {
     }
 }
 
-function SetConnectionString {
-    [Diagnostics.CodeAnalysis.SuppressMessageAttribute("PSAvoidUsingUserNameAndPassWordParams", "", Justification="Filename handled by parameters, not the password.")]
-    [Diagnostics.CodeAnalysis.SuppressMessageAttribute("PSAvoidUsingPlainTextForPassword", "PasswordFile", Justification="This variable is a filename.")]
-    [OutputType([System.String])]
-    [CmdletBinding(DefaultParameterSetName = "Default", SupportsShouldProcess = $false)]
-    param(
-        [parameter(Mandatory = $true, Position = 0, ParameterSetName = "Default")]
-        [alias("lc")]
-        [boolean]
-        $LocalComputer,
-        [parameter(Mandatory = $true, Position = 1, ParameterSetName = "Default")]
-        [alias("rcn")]
-        [string]
-        $RemoteComputerName,
-        [parameter(Mandatory = $false, ParameterSetName = "Default")]
-        [string]
-        $InstanceName = "Default",
-        [parameter(Mandatory = $false, ParameterSetName = "Default")]
-        [boolean]
-        $IntegratedSecurity = $true,
-        [parameter(Mandatory = $false, ParameterSetName = "Default")]
-        [alias("user")]
-        [string]
-        $UserName = "",
-        [parameter(Mandatory = $false, ParameterSetName = "Default")]
-        [alias("pf")]
-        [string]
-        $PasswordFile = "",
-        [parameter(Mandatory = $false, ParameterSetName = "Default")]
-        [alias("dbgl")]
-        [int]
-        $DBGLevel = 0)
-
-    # Get and store the function Name.
-    $fn = GetFunctionName
-
-    try {
-        # Define the requested server name.
-        $computerName = ResolveComputerName $LocalComputer $RemoteComputerName
-
-        # Define the complete SQL Server name (Server + instance name).
-        $sqlServerName = ReturnSQLServerName $computerName $InstanceName
-
-        # SQL Server uses named instance.
-        # If you use the integrated security to connect to your PI AF Storage Server use this connection string template.
-        $connectionStringTemplate1 = "Server={0};Database=master;Integrated Security=SSPI;"
-        # If you use the sa account to connect to your PI AF Storage Server use this connection string template.
-        $connectionStringTemplate2 = "Server={0};Database=master;User ID={1};Password={2};"
-
-        # Define the connection string.
-        if ($IntegratedSecurity)
-        { $connectionString = [string]::format($connectionStringTemplate1, $sqlServerName) }
-        else {
-            if ($PasswordFile -eq "") {
-                # Read from the global constant bag.
-                # Read the secure password from the cache
-                $securePWDFromCache = (Get-Variable "PISysAuditCachedSecurePWD" -Scope "Global" -ErrorAction "SilentlyContinue").Value
-                if (($null -eq $securePWDFromCache) -or ($securePWDFromCache -eq "")) {
-                    # Return the error message.
-                    $msg = "The password is not stored in cache"
-                    Write-PISysAudit_LogMessage $msg "Error" $fn
-                    return $null
-                }
-                else {
-                    # Verbose only if Debug Level is 2+
-                    $msg = "The password stored in cached will be used for SQL connection"
-                    Write-PISysAudit_LogMessage $msg "debug" $fn -dbgl $DBGLevel -rdbgl 2
-
-                    # The CLU does not understand secure string and needs to get the raw password
-                    # Use the pointer method to reach the value in memory.
-                    $pwd = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($securePWDFromCache))
-                }
-            }
-            else
-            { $pwd = GetPasswordOnDisk $PasswordFile }
-            $connectionString = [string]::format($connectionStringTemplate2, $SQLServerName, $UserName, $pwd)
-        }
-
-        # Return the connection string.
-        return $connectionString
-
-    }
-    catch {
-        # Return the error message.
-        $msg = "Setting the connection string has failed"
-        Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_
-        return $null
-    }
-}
-
 function ExecuteCommandLineUtility
 # Run a command line utility on the local or remote computer,
 # directing the output to a file. Read from the file, delete the
@@ -484,6 +370,7 @@ function ExecuteCommandLineUtility
 }
 
 function GetPasswordOnDisk {
+    [OutputType([System.String])]
     [CmdletBinding(DefaultParameterSetName = "Default", SupportsShouldProcess = $false)]
     param(
         [parameter(Mandatory = $true, Position = 0, ParameterSetName = "Default")]
@@ -505,7 +392,6 @@ function GetPasswordOnDisk {
 
         $securePWD = Get-Content -Path $pwdFile | ConvertTo-SecureString
 
-        # Return the password.
         return [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($securePWD))
     }
     catch {
@@ -681,6 +567,7 @@ function ValidateIfHasPIWebApiRole {
 }
 
 function ExecuteWMIQuery {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute("PSAvoidUsingWMICmdlet", "", Justification="CIM favored over WMI for consistency cross platform, but this tool only supports Windows.")]
     [CmdletBinding(DefaultParameterSetName = "Default", SupportsShouldProcess = $false)]
     param(
         [parameter(Mandatory = $true, Position = 0, ParameterSetName = "Default")]
@@ -2353,91 +2240,6 @@ Get a property (state, startup type, or logon account) of a service on a given c
     #***************************
 }
 
-function Get-PISysAudit_AccountProperty {
-    <#
-.SYNOPSIS
-(Core functionality) Get a property of a user on a given computer.
-.DESCRIPTION
-Get a property of a user on a given computer.
-#>
-    [CmdletBinding(DefaultParameterSetName = "Default", SupportsShouldProcess = $false)]
-    param(
-        [parameter(Mandatory = $true, Position = 0, ParameterSetName = "Default")]
-        [alias("an")]
-        [string]
-        $AccountName,
-        [parameter(Mandatory = $true, Position = 1, ParameterSetName = "Default")]
-        [alias("ap")]
-        [ValidateSet("Caption", "SID", "Domain", "Name", "All")]
-        [string]
-        $AccountProperty,
-        [parameter(Mandatory = $false, ParameterSetName = "Default")]
-        [alias("lc")]
-        [boolean]
-        $LocalComputer = $true,
-        [parameter(Mandatory = $false, ParameterSetName = "Default")]
-        [alias("rcn")]
-        [string]
-        $RemoteComputerName = "",
-        [parameter(Mandatory = $false, ParameterSetName = "Default")]
-        [alias("dbgl")]
-        [int]
-        $DBGLevel = 0)
-    BEGIN {}
-    PROCESS {
-        $fn = GetFunctionName
-
-        $className = "Win32_UserAccount"
-        $namespace = "root\CIMV2"
-
-        try {
-            $Account = Get-PISysAudit_ParseDomainAndUserFromString -UserString $AccountName
-
-            $filterExpression = [string]::Format("Name='{0}'", $Account.UserName)
-            if ($Account.Domain -eq 'MACHINEACCOUNT') {
-                $className = "Win32_SystemAccount"
-                switch ($Account.UserName) {
-                    "LocalSystem" { $Account.UserName = "SYSTEM" }
-                    "Local System" { $Account.UserName = "SYSTEM" }
-                    "LocalService" { $Account.UserName = "Local Service" }
-                    "Local Service" { $Account.UserName = "Local Service" }
-                    "NetworkService" { $Account.UserName = "Network Service" }
-                    "Network Service" { $Account.UserName = "Network Service" }
-                }
-                $filterExpression = [string]::Format("Name='{0}'", $Account.UserName)
-            }
-            elseif ($Account.Domain -eq '.' -or $Account.Domain -eq '') {
-                $filterExpression = [string]::Format("Name='{0}' AND LocalAccount='TRUE'", $Account.UserName)
-            }
-            else {
-                $filterExpression = [string]::Format("Name='{0}' AND LocalAccount='FALSE' AND Domain='{1}'", $Account.UserName, $Account.Domain)
-            }
-
-            $WMIObject = ExecuteWMIQuery $className -n $namespace -lc $LocalComputer -rcn $RemoteComputerName -FilterExpression $filterExpression -DBGLevel $DBGLevel
-
-            if ($UserAccountProperty -eq 'All') { # Return the whole object
-                return $WMIObject
-            }
-            else { # Return the explicitly requested property
-                $Property = $AccountProperty
-                return ($WMIObject | Select-Object -ExpandProperty $Property)
-            }
-        }
-        catch {
-
-            # Return the error message.
-            Write-PISysAudit_LogMessage "Execution of WMI Query has failed!" "Error" $fn -eo $_
-            return $null
-        }
-    }
-
-    END {}
-
-    #***************************
-    #End of exported function
-    #***************************
-}
-
 function Get-PISysAudit_CertificateProperty {
     <#
 .SYNOPSIS
@@ -2654,97 +2456,6 @@ only supports returning the Type of record.
         }
         catch {
             Write-PISysAudit_LogMessage "Accessing DNS record failed!" "Error" $fn -eo $_
-            return $null
-        }
-    }
-
-    END {}
-
-    #***************************
-    #End of exported function
-    #***************************
-}
-
-function Get-PISysAudit_GroupMember {
-    <#
-.SYNOPSIS
-(Core functionality) Return the members of a group.
-.DESCRIPTION
-Return the members of a group.
-#>
-    [CmdletBinding(DefaultParameterSetName = "Default", SupportsShouldProcess = $false)]
-    param(
-        [parameter(Mandatory = $true, Position = 0, ParameterSetName = "Default")]
-        [alias("gn")]
-        [string]
-        $GroupName,
-        [parameter(Mandatory = $true, Position = 1, ParameterSetName = "Default")]
-        [alias("gd")]
-        [string]
-        $GroupDomain,
-        [parameter(Mandatory = $false, Position = 1, ParameterSetName = "Default")]
-        [alias("cu")]
-        [string]
-        $CheckUser = "",
-        [parameter(Mandatory = $false, ParameterSetName = "Default")]
-        [alias("lc")]
-        [boolean]
-        $LocalComputer = $true,
-        [parameter(Mandatory = $false, ParameterSetName = "Default")]
-        [alias("rcn")]
-        [string]
-        $RemoteComputerName = "",
-        [parameter(Mandatory = $false, ParameterSetName = "Default")]
-        [alias("dbgl")]
-        [int]
-        $DBGLevel = 0)
-    BEGIN {}
-    PROCESS {
-        $fn = GetFunctionName
-        $blnCheckUser = $CheckUser -ne ""
-        $className = "win32_GroupUser"
-        $namespace = "root\CIMV2"
-        try {
-            if ($blnCheckUser) {
-                $CheckUserObject = Get-PISysAudit_ParseDomainAndUserFromString -UserString $CheckUser
-                if ($CheckUserObject.Domain -eq '.' -or $CheckUserObject.Domain -eq 'MACHINEACCOUNT')
-                { $CheckUserObject.Domain = $RemoteComputerName.Split(".")[0] } # use the hostname
-            }
-
-            if ($GroupDomain.ToLower() -eq 'local')
-            { $GroupDomain = $RemoteComputerName.Split(".")[0] }
-
-            $filterExpression = "GroupComponent=`"Win32_Group.Domain='$GroupDomain',Name='$GroupName'`""
-            $WMIObject = ExecuteWMIQuery $className -n $namespace -lc $LocalComputer -rcn $RemoteComputerName -FilterExpression $filterExpression -DBGLevel $DBGLevel
-
-            $GroupMembers = @()
-            Foreach ($entry in $WMIObject) {
-                # PartComponent always has the form below.
-                # \\<Machine>\root\cimv2:Win32_UserAccount.Domain="<Domain>",Name="<Name>"
-                $entry = $entry.PartComponent.Split(',').Split('=').Trim('"')
-                $Domain = $entry[1]
-                $Name = $entry[3]
-                if ($blnCheckUser) {
-                    if ($CheckUserObject.Domain -eq $Domain -and $CheckUserObject.UserName -eq $Name)
-                    { return $true }
-                }
-                else {
-                    $GroupMember = New-Object pscustomobject
-                    $GroupMember | Add-Member -MemberType NoteProperty -Name 'Domain' -Value $Domain
-                    $GroupMember | Add-Member -MemberType NoteProperty -Name 'Name' -Value $Name
-                    $GroupMembers += $GroupMember
-                }
-            }
-
-            if ($blnCheckUser)
-            { return $false }
-            else
-            { return $GroupMembers }
-        }
-        catch {
-
-            # Return the error message.
-            Write-PISysAudit_LogMessage "Execution of WMI Query has failed!" "Error" $fn -eo $_
             return $null
         }
     }
@@ -3020,6 +2731,7 @@ function Get-PISysAudit_AppLockerState {
 .DESCRIPTION
 Get the state of AppLocker.
 #>
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute("PSAvoidUsingWMICmdlet", "", Justification="CIM favored over WMI for consistency cross platform, but this tool only supports Windows.")]
     [CmdletBinding(DefaultParameterSetName = "Default", SupportsShouldProcess = $false)]
     param(
         [parameter(Mandatory = $false, ParameterSetName = "Default")]
@@ -3855,112 +3567,6 @@ Check for the existence of an SPN
     #***************************
 }
 
-function Invoke-PISysAudit_ADONET_ScalarValueFromSQLServerQuery {
-    <#
-.SYNOPSIS
-(Core functionality) Perform a SQL query against a local/remote computer using an ADO.NET connection.
-.DESCRIPTION
-Perform a SQL query against a local/remote computer using an ADO.NET connection.
-#>
-    [Diagnostics.CodeAnalysis.SuppressMessageAttribute("PSAvoidUsingUserNameAndPassWordParams", "", Justification="Specifying a filename, not a password.")]
-    [Diagnostics.CodeAnalysis.SuppressMessageAttribute("PSAvoidUsingPlainTextForPassword", "PasswordFile", Justification="This variable is a filename.")]
-    [CmdletBinding(DefaultParameterSetName = "Default", SupportsShouldProcess = $false)]
-    param(
-        [parameter(Mandatory = $true, Position = 0, ParameterSetName = "Default")]
-        [alias("lc")]
-        [boolean]
-        $LocalComputer,
-        [parameter(Mandatory = $true, Position = 1, ParameterSetName = "Default")]
-        [alias("rcn")]
-        [string]
-        $RemoteComputerName,
-        [parameter(Mandatory = $true, Position = 2, ParameterSetName = "Default")]
-        [alias("rspc")]
-        [boolean]
-        $Require_sp_configure,
-        [parameter(Mandatory = $true, Position = 3, ParameterSetName = "Default")]
-        [alias("q")]
-        [string]
-        $Query,
-        [parameter(Mandatory = $false, ParameterSetName = "Default")]
-        [string]
-        $InstanceName = "",
-        [parameter(Mandatory = $false, ParameterSetName = "Default")]
-        [boolean]
-        $IntegratedSecurity = $true,
-        [parameter(Mandatory = $false, ParameterSetName = "Default")]
-        [alias("user")]
-        [string]
-        $UserName = "",
-        [parameter(Mandatory = $false, ParameterSetName = "Default")]
-        [alias("pf")]
-        [string]
-        $PasswordFile = "",
-        [parameter(Mandatory = $false, ParameterSetName = "Default")]
-        [alias("dbgl")]
-        [int]
-        $DBGLevel = 0)
-    BEGIN {}
-    PROCESS {
-        $fn = GetFunctionName
-
-        try {
-            # Define the connection string.
-            $connectionString = SetConnectionString $LocalComputer $RemoteComputerName -InstanceName $InstanceName `
-                -IntegratedSecurity $IntegratedSecurity -user $UserName -pf $PasswordFile -dbgl $DBGLevel
-
-            # Create a connection object.
-            $conn = New-Object System.Data.SQLClient.SQLConnection
-            $conn.ConnectionString = $connectionString
-
-            # Open the connection
-            $conn.Open()
-
-            # Does it require to execute the sp_configure stored procedure?
-            if ($Require_sp_configure) {
-                $sp_configure_query = "EXEC sp_configure 'show advanced options', 1;Reconfigure;"
-
-                # Create a sql command
-                $sp_configure_cmd = new-object System.Data.SqlClient.SqlCommand
-                $sp_configure_cmd.Connection = $conn
-
-                # Execute first command.
-                $sp_configure_cmd.CommandText = $sp_configure_query
-                $sp_configure_cmd.CommandTimeout = 600
-                # The query returns the result but we are not interested, so send it
-                # to null.
-                $sp_configure_cmd.ExecuteNonQuery() | Out-Null
-            }
-
-            # Get the value.
-            $query_cmd = new-object System.Data.SqlClient.SqlCommand
-            $query_cmd.Connection = $conn
-            $query_cmd.CommandText = $Query
-            $query_cmd.CommandTimeout = 600
-
-            # Execute a scalar function.
-            $value = $query_cmd.ExecuteScalar()
-        }
-        catch {
-            # Return the error message.
-            $msgTemplate = "A problem occurred during the SQL Query: {0}"
-            $msg = [string]::Format($msgTemplate, $_.Exception.Message)
-            Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_
-            $value = $null
-        }
-
-        # Close the connection.
-        if (!($null -eq $conn)) { $conn.Close() }
-        return $value
-    }
-
-    END {}
-
-    #***************************
-    #End of exported function
-    #***************************
-}
-
 function Invoke-PISysAudit_Sqlcmd_ScalarValue {
     <#
 .SYNOPSIS
@@ -4411,6 +4017,7 @@ https://pisquare.osisoft.com
 #>
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute("PSUseSingularNouns", "", Justification="Users are used to this name.")]
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute("PSAvoidUsingUserNameAndPassWordParams", "", Justification="Specifying a filename, not a password.")]
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute("PSAvoidUsingPlainTextForPassword", "", Justification="Specifying a filename, not a password.")]
     [CmdletBinding(DefaultParameterSetName = "Default", SupportsShouldProcess = $false)]
     param(
         [parameter(Mandatory = $true, Position = 0, ParameterSetName = "Default")]
@@ -5294,11 +4901,9 @@ Export-ModuleMember Get-PISysAudit_RegistryKeyValue
 Export-ModuleMember Get-PISysAudit_TestRegistryKey
 Export-ModuleMember Get-PISysAudit_ParseDomainAndUserFromString
 Export-ModuleMember Get-PISysAudit_ServiceProperty
-Export-ModuleMember Get-PISysAudit_AccountProperty
 Export-ModuleMember Get-PISysAudit_CertificateProperty
 Export-ModuleMember Get-PISysAudit_BoundCertificate
 Export-ModuleMember Get-PISysAudit_ResolveDnsName
-Export-ModuleMember Get-PISysAudit_GroupMember
 Export-ModuleMember Get-PISysAudit_ServicePrivilege
 Export-ModuleMember Get-PISysAudit_InstalledComponent
 Export-ModuleMember Get-PISysAudit_InstalledKB
@@ -5311,7 +4916,6 @@ Export-ModuleMember Test-PISysAudit_SecurePIConnection
 Export-ModuleMember Test-PISysAudit_ServicePrincipalName
 Export-ModuleMember Test-PISysAudit_PrincipalOrGroupType
 Export-ModuleMember Invoke-PISysAudit_AFDiagCommand
-Export-ModuleMember Invoke-PISysAudit_ADONET_ScalarValueFromSQLServerQuery
 Export-ModuleMember Invoke-PISysAudit_Sqlcmd_ScalarValue
 Export-ModuleMember Invoke-PISysAudit_SPN
 Export-ModuleMember New-PISysAuditObject
