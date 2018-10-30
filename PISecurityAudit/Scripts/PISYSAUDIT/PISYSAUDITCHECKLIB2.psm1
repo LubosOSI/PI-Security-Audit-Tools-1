@@ -1636,17 +1636,18 @@ see:
     #***************************
 }
 
-function Get-PISysAudit_CheckPINetworkManagerConfiguredAccount {
-    <#
+function Get-PISysAudit_CheckPINetworkManagerConfiguredAccount 
+{
+<#
 .SYNOPSIS
 AU20015 -  - PI Network Manager Service Account
 .DESCRIPTION
 VALIDATION: Verifies that PI Data Archive version is greater than 2017 R2
 and the PI Network Manager application service is running as the account NT Service\PINetMgr.
 If PI Data Archive version is less than 2017 R2, PI Network Manager Application Service
-will run as Local System by default.
+will run as Local System by default. <br/>
 COMPLIANCE: Run the PI Network Manager Application service as default account
-NT Service\PINetMgr with PI Data Archive version greater than 2017 R2.
+NT Service\PINetMgr with PI Data Archive version greater than 2017 R2. <br/>
 #>
     [CmdletBinding(DefaultParameterSetName = "Default", SupportsShouldProcess = $false)]
     param(

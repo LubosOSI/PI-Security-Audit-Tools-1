@@ -4837,6 +4837,59 @@ https://pisquare.osisoft.com
     #***************************
 }
 
+function Get-PISysAudit_CimInstance {
+    <#
+.SYNOPSIS
+Get-CimInstance
+.DESCRIPTION
+Run Get-CimInstance command locally and remotely with classname and namespace
+#>
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute("PSUseApprovedVerbs", "", Justification="Template function; implementer expected to rename.")]
+    [CmdletBinding(DefaultParameterSetName = "Default", SupportsShouldProcess = $false)]
+    param(
+	    [parameter(Mandatory = $true, ParameterSetName = "Default")]
+        [alias("cl")]
+        $Class,
+	    [parameter(Mandatory = $false, ParameterSetName = "Default")]
+        [alias("ns")]
+        $Namespace,
+		[parameter(Mandatory = $false, ParameterSetName = "Default")]
+        [alias("lc")]
+        [boolean]
+        $LocalComputer,
+        [parameter(Mandatory = $false, ParameterSetName = "Default")]
+        [alias("rcn")]
+        [string]
+        $RemoteComputerName)
+    BEGIN {}
+    PROCESS {
+		$output = $null
+		try
+		{
+			if($LocalComputer)
+			{
+				$output = Get-CimInstance -ClassName $Class -Namespace $Namespace
+			}
+			else
+			{
+				$output = Get-CimInstance -ClassName $Class -Namespace $Namespace -ComputerName $RemoteComputerName
+			}
+			return $output
+		}
+		catch
+		{
+            # Return the error message.
+            $msg = "A problem occurred using Get-CimInstance"
+            Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_
+			return $null
+		}
+    }
+    END {}
+    #***************************
+    #End of exported function
+    #***************************
+}
+
 # ........................................................................
 # Add your core function by replacing the Verb-PISysAudit_TemplateCore one.
 # Implement the functionality you want. Don't forget to modify the parameters
@@ -4912,6 +4965,7 @@ Export-ModuleMember Get-PISysAudit_FirewallState
 Export-ModuleMember Get-PISysAudit_AppLockerState
 Export-ModuleMember Get-PISysAudit_KnownServers
 Export-ModuleMember Get-PISysAudit_ProcessedPIConnectionStatistics
+Export-ModuleMember Get-PISysAudit_CimInstance
 Export-ModuleMember Test-PISysAudit_SecurePIConnection
 Export-ModuleMember Test-PISysAudit_ServicePrincipalName
 Export-ModuleMember Test-PISysAudit_PrincipalOrGroupType
