@@ -21,7 +21,7 @@
     ModuleToProcess        = ''
 
     # Version number of this module.
-    ModuleVersion          = '2.2.0.3'
+    ModuleVersion          = '2.2.0.4'
 
     # ID used to uniquely identify this module
     GUID                   = '79552d65-86e9-4648-bbba-acf5f5f01ced'
@@ -33,7 +33,7 @@
     CompanyName            = 'OSIsoft'
 
     # Copyright statement for this module
-    Copyright              = '(c) 2017 OSIsoft. All rights reserved.'
+    Copyright              = '(c) 2018 OSIsoft. All rights reserved.'
 
     # Description of the functionality provided by this module
     Description            = 'Collection of tools to audit PI System security.'

@@ -2000,8 +2000,8 @@ Read a value from the Windows Registry Hive.
         try {
             $scriptBlock = {
                 param([string]$Path, [string]$Name)
-                if (Test-Path -Path $Path) {
-                    $Value = Get-ItemProperty -Path $Path -Name $Name | Select-Object -ExpandProperty $Name
+                if (Test-Path -LiteralPath $Path) {
+                    $Value = Get-ItemProperty -LiteralPath $Path -Name $Name | Select-Object -ExpandProperty $Name
                 }
                 else {
                     $Value = $null
@@ -2501,7 +2501,7 @@ Get installed software on a given computer.
                 param([string]$RegKey)
                 if ($RegKey -like 'Wow6432') { $Action = 'SilentlyContinue' }
                 else { $Action = 'Continue' }
-                Get-ChildItem $RegKey -ErrorAction $Action | ForEach-Object { Get-ItemProperty $_.PsPath } | Where-Object { $_.Displayname -and ($_.Displayname -match ".*") }
+                Get-ChildItem -LiteralPath $RegKey -ErrorAction $Action | ForEach-Object { Get-ItemProperty -LiteralPath $_.PsPath } | Where-Object { $_.Displayname -and ($_.Displayname -match ".*") }
             }
 
             if ($LocalComputer) {
@@ -2820,7 +2820,7 @@ Get the servers in the PI Data Archive or PI AF Server KST.
     If ($ServerType -eq 'PIServer') {
         # Get PI Servers
         $regpathKST = 'HKLM:\SOFTWARE\PISystem\PI-SDK\1.0\ServerHandles'
-        $scriptBlock = {param([string]$RegPath) Get-ChildItem $RegPath | ForEach-Object {Get-ItemProperty $_.pspath} | where-object {$_.path} | Foreach-Object {$_.path}}
+        $scriptBlock = {param([string]$RegPath) Get-ChildItem $RegPath | ForEach-Object {Get-ItemProperty -LiteralPath $_.pspath} | where-object {$_.path} | Foreach-Object {$_.path}}
         if ($LocalComputer)
         { $KnownServers = & $scriptBlock -RegPath $regpathKST }
         Else
@@ -4816,7 +4816,7 @@ https://pisquare.osisoft.com
         Write-PISysAudit_LogMessage $msg "Info" $fn
 
         $InstallationType = Get-ItemProperty -Path "HKLM:\Software\Microsoft\Windows NT\CurrentVersion" -Name "InstallationType" | Select-Object -ExpandProperty "InstallationType" | Out-String
-        if ($ExecutionContext.SessionState.LanguageMode -ne 'ConstrainedLanguage' -and $InstallationType -ne 'Server Core') {
+        if ($ExecutionContext.SessionState.LanguageMode -ne 'ConstrainedLanguage' -and $InstallationType -ne 'Server Core' -and $ShowUI) {
             $title = "PI Security Audit Report"
             $message = "Would you like to view the PI Security Audit Report now?"
             $yes = New-Object System.Management.Automation.Host.ChoiceDescription "&Yes", "Open the report in your default browser."
@@ -4832,6 +4832,59 @@ https://pisquare.osisoft.com
 
     END {}
 
+    #***************************
+    #End of exported function
+    #***************************
+}
+
+function Get-PISysAudit_CimInstance {
+    <#
+.SYNOPSIS
+Get-CimInstance
+.DESCRIPTION
+Run Get-CimInstance command locally and remotely with classname and namespace
+#>
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute("PSUseApprovedVerbs", "", Justification="Template function; implementer expected to rename.")]
+    [CmdletBinding(DefaultParameterSetName = "Default", SupportsShouldProcess = $false)]
+    param(
+	    [parameter(Mandatory = $true, ParameterSetName = "Default")]
+        [alias("cl")]
+        $Class,
+	    [parameter(Mandatory = $false, ParameterSetName = "Default")]
+        [alias("ns")]
+        $Namespace,
+		[parameter(Mandatory = $false, ParameterSetName = "Default")]
+        [alias("lc")]
+        [boolean]
+        $LocalComputer,
+        [parameter(Mandatory = $false, ParameterSetName = "Default")]
+        [alias("rcn")]
+        [string]
+        $RemoteComputerName)
+    BEGIN {}
+    PROCESS {
+		$output = $null
+		try
+		{
+			if($LocalComputer)
+			{
+				$output = Get-CimInstance -ClassName $Class -Namespace $Namespace
+			}
+			else
+			{
+				$output = Get-CimInstance -ClassName $Class -Namespace $Namespace -ComputerName $RemoteComputerName
+			}
+			return $output
+		}
+		catch
+		{
+            # Return the error message.
+            $msg = "A problem occurred using Get-CimInstance"
+            Write-PISysAudit_LogMessage $msg "Error" $fn -eo $_
+			return $null
+		}
+    }
+    END {}
     #***************************
     #End of exported function
     #***************************
@@ -4912,6 +4965,7 @@ Export-ModuleMember Get-PISysAudit_FirewallState
 Export-ModuleMember Get-PISysAudit_AppLockerState
 Export-ModuleMember Get-PISysAudit_KnownServers
 Export-ModuleMember Get-PISysAudit_ProcessedPIConnectionStatistics
+Export-ModuleMember Get-PISysAudit_CimInstance
 Export-ModuleMember Test-PISysAudit_SecurePIConnection
 Export-ModuleMember Test-PISysAudit_ServicePrincipalName
 Export-ModuleMember Test-PISysAudit_PrincipalOrGroupType
